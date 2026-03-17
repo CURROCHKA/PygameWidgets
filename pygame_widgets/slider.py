@@ -124,7 +124,7 @@ class Slider(WidgetBase):
 
 
 if __name__ == '__main__':
-    from pygame_widgets.textbox import TextBox
+    from pygame_widgets.textbox_current import TextBox
 
     pygame.init()
     win = pygame.display.set_mode((1000, 600))

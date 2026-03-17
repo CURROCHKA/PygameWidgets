@@ -1,7 +1,7 @@
 import pygame_widgets
 from pygame_widgets import Mouse
 from pygame_widgets.widget import WidgetBase
-from pygame_widgets.textbox import TextBox
+from pygame_widgets.textbox_current import TextBox
 from pygame_widgets.dropdown import Dropdown, DropdownChoice
 
 
