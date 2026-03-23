@@ -33,13 +33,13 @@ class TextBox(WidgetBase):
         self.cursorPosition = 0
         self.oldRelativeCursorPosition = 0
         self.cursorCoords = None
+        self.insertOn = False # TODO: проверять статус клавишы
 
         self.selectedLine = 0
         
         self.isChanged = False
         self.text = ['']
         self.cachedVisualLines = []
-        self.highlightedText = []
 
         # Border
         self.borderThickness = kwargs.get('borderThickness', 3)
@@ -99,9 +99,16 @@ class TextBox(WidgetBase):
                 self.selected = True
                 self.showCursor = True
                 self.cursorTime = pygame.time.get_ticks()
+
+                self._setCursorPositionFromMouse(x, y)
+
                 pygame.key.set_repeat(self.REPEAT_DELAY, self.REPEAT_INTERVAL)
             else:
                 self.escape()
+            
+        elif mouseState == MouseState.DRAG and self.contains(x, y):
+            self.cursorTime = pygame.time.get_ticks()
+            self._setCursorPositionFromMouse(x, y)
 
         # Keyboard Input
         if self.selected:
@@ -260,7 +267,7 @@ class TextBox(WidgetBase):
                         pass
 
                     elif event.key == pygame.K_INSERT:
-                        pass
+                        self.insertOn = not self.insertOn # TODO: add insert logic
 
                     elif event.key == pygame.K_ESCAPE:
                         self.escape()
@@ -282,8 +289,8 @@ class TextBox(WidgetBase):
 
     def drawText(self) -> None:
         """ Отрисовка текста и расчет позиции курсора """
-        xBase = self._x + self.textOffsetLeft
-        yBase = self._y + self.textOffsetTop
+        xBase = self._x + self.textOffsetLeft + self.borderThickness
+        yBase = self._y + self.textOffsetTop + self.borderThickness
 
         if self.isChanged:
             self.cachedVisualLines = self.getVisualLines()
@@ -446,7 +453,51 @@ class TextBox(WidgetBase):
             relativePosition = self.cursorPosition - visualLine['startAt']
 
             self.oldRelativeCursorPosition = relativePosition
+
+    def _setCursorPositionFromMouse(self, mouseX: int, mouseY: int):
+        xBase = self._x + self.textOffsetLeft + self.borderThickness
+        yBase = self._y + self.textOffsetTop + self.borderThickness
         
+        for i, visualLine in enumerate(self.cachedVisualLines):
+            lineY = yBase + self.fontSize * i
+
+            if lineY < mouseY < lineY + self.fontSize:
+                if visualLine['lineIndex'] != self.selectedLine:
+                    self.selectedLine = visualLine['lineIndex']
+
+                firstLetter = visualLine['text'][0]
+                firstLetterWidth = self.font.size(firstLetter)[0]
+
+                if self._x <= mouseX < xBase + firstLetterWidth // 2:
+                    self.cursorPosition = visualLine['startAt']
+                    break
+            
+                wholeLine = visualLine['text']
+                wholeLineWidth = self.font.size(wholeLine)[0]
+
+                if xBase + wholeLineWidth <= mouseX:
+                    self.cursorPosition = visualLine['startAt'] + len(visualLine['text'])
+                    break
+
+                count = 0
+
+                while True:
+
+                    count += 1
+                    textBefore = visualLine['text'][:count - 1]
+                    textCurrent = visualLine['text'][:count]
+                    textAfter = visualLine['text'][:count + 1]
+
+                    x1 = xBase + (self.font.size(textBefore)[0] + self.font.size(textCurrent)[0]) / 2
+                    x2 = xBase + (self.font.size(textCurrent)[0] + self.font.size(textAfter)[0]) / 2
+
+                    if x1 <= mouseX <= x2:
+                        self.cursorPosition = visualLine['startAt'] + count
+                        break
+
+                # self.cursorPosition = len(visualLine['text'][:count])
+                break
+
     def getText(self) -> str:
         return '\n'.join(self.text)
 
