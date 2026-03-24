@@ -465,6 +465,10 @@ class TextBox(WidgetBase):
                 if visualLine['lineIndex'] != self.selectedLine:
                     self.selectedLine = visualLine['lineIndex']
 
+                if len(visualLine['text']) == 0:
+                    self.cursorPosition = visualLine['startAt']
+                    break
+
                 firstLetter = visualLine['text'][0]
                 firstLetterWidth = self.font.size(firstLetter)[0]
 
@@ -495,7 +499,6 @@ class TextBox(WidgetBase):
                         self.cursorPosition = visualLine['startAt'] + count
                         break
 
-                # self.cursorPosition = len(visualLine['text'][:count])
                 break
 
     def getText(self) -> str:
