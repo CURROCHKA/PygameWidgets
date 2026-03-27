@@ -3,6 +3,8 @@ import pygame_widgets
 from pygame_widgets.widget import WidgetBase
 from pygame_widgets.mouse import Mouse, MouseState
 
+from dataclasses import dataclass
+
 
 class TextBox(WidgetBase):
     # Times in ms
@@ -27,67 +29,63 @@ class TextBox(WidgetBase):
         """
         super().__init__(win, x, y, width, height, isSubWidget)
 
+        # Widget state
         self.selected = False
-        self.showCursor = False
-        self.cursorTime = 0
-        self.cursorPosition = 0
-        self.oldRelativeCursorPosition = 0
-        self.cursorCoords = None
-        self.insertOn = False # TODO: проверять статус клавишы
-
-        self.selectedLine = 0
-        
         self.isChanged = False
+        self.isLabel = kwargs.get('isLabel', False)
+        self.originalRepeat = pygame.key.get_repeat()
+
+        # Cursor state and style
+        self.cursor = Cursor()
+        self.cursorWidth = kwargs.get('cursorWidth', 2)
+        self.cursorColour = kwargs.get('cursorColour', (0, 0, 0))
+
+        # Text state
         self.text = ['']
         self.cachedVisualLines = []
+        self.tabSpaces = kwargs.get('tabSpaces', 4)
 
+        # Font style
+        self.fontSize = kwargs.get('fontSize', 20)
+        self.font = kwargs.get('font', pygame.font.SysFont('calibri', self.fontSize))
+        self.textColour = kwargs.get('textColour', (0, 0, 0))
+        
+        # Margins
+        self.textOffsetTop = self.fontSize // 3
+        self.textOffsetLeft = self.fontSize // 3
+        self.textOffsetRight = self.fontSize // 2
+
+        # Placeholder
+        self.placeholderText = kwargs.get('placeholderText', '')
+        self.placeholderTextColour = kwargs.get('placeholderTextColour', (10, 10, 10))
+
+        # Widget style
+        self.colour = kwargs.get('colour', (220, 220, 220))
+        self.borderThickness = kwargs.get('borderThickness', 3)
+        self.borderColour = kwargs.get('borderColour', (0, 0, 0))
+        self.radius = kwargs.get('radius', 0)
+
+        # Highlight state and style
         self.highlightedText = ['']
         self.highlightStartLine = 0
         self.highlightEndLine = 0
         self.highlightStartInline = 0
         self.highlightEndInline = 0
-
-        # Border
-        self.borderThickness = kwargs.get('borderThickness', 3)
-        self.borderColour = kwargs.get('borderColour', (0, 0, 0))
-        self.radius = kwargs.get('radius', 0)
-
-        # Colour
-        self.colour = kwargs.get('colour', (220, 220, 220))
-        self.cursorColour = kwargs.get('cursorColour', (0, 0, 0))
-
-        # Text
-        self.isLabel = kwargs.get(
-            'isLabel', False
-        )  # If you want to highlight, copy and so on without texting
-        self.placeholderText = kwargs.get('placeholderText', '')
-        self.placeholderTextColour = kwargs.get('placeholderTextColour', (10, 10, 10))
-        self.textColour = kwargs.get('textColour', (0, 0, 0))
         self.highlightColour = kwargs.get('highlightColour', (166, 210, 255))
-        self.fontSize = kwargs.get('fontSize', 20)
-        self.font = kwargs.get('font', pygame.font.SysFont('calibri', self.fontSize))
-        self.tabSpaces = kwargs.get('tabSpaces', 4)
 
-        self.textOffsetTop = self.fontSize // 3
-        self.textOffsetLeft = self.fontSize // 3
-        self.textOffsetRight = self.fontSize // 2
-
-        # Functions
+        # Callback
         self.onSubmit = kwargs.get('onSubmit', lambda *args: None)
         self.onSubmitParams = kwargs.get('onSubmitParams', ())
         self.onTextChanged = kwargs.get('onTextChanged', lambda *args: None)
         self.onTextChangedParams = kwargs.get('onTextChangedParams', ())
 
-        self.cursorWidth = kwargs.get('cursorWidth', 2)
-
+        # Layout
         self._actualWidth = (
-            self._width
-            - self.textOffsetRight
-            - self.textOffsetLeft
+            self._width 
+            - self.textOffsetRight 
+            - self.textOffsetLeft 
             - self.borderThickness * 2
         )
-
-        self.originalRepeat = pygame.key.get_repeat()
 
     def listen(self, events) -> None:
         """ Wait for inputs
@@ -153,24 +151,23 @@ class TextBox(WidgetBase):
                     elif event.key in [pygame.K_HOME, pygame.K_KP_7 if not event.mod & pygame.KMOD_NUM else -1]:
                         visualLineIndex = self.getCurrentVisualLineIndex()
 
-                        if visualLineIndex != -1:
-                            visualLine = self.cachedVisualLines[visualLineIndex]
-                            self.cursorPosition = visualLine['startAt']
-                            self._setOldRelativeCursorPosition()
+                        visualLine = self.cachedVisualLines[visualLineIndex]
+                        self.cursor.column = visualLine['startAt']
+                        self._setOldRelativeCursorPosition()
 
                     elif event.key in [pygame.K_END, pygame.K_KP_1 if not event.mod & pygame.KMOD_NUM else -1]:
                         visualLineIndex = self.getCurrentVisualLineIndex()
 
-                        if visualLineIndex != -1:
-                            visualLine = self.cachedVisualLines[visualLineIndex]
-                            self.cursorPosition = visualLine['startAt'] + len(visualLine['text'])
-                            self._setOldRelativeCursorPosition()
+                        visualLine = self.cachedVisualLines[visualLineIndex]
+                        self.cursor.column = visualLine['startAt'] + len(visualLine['text'])
+                        self._setOldRelativeCursorPosition()
 
                     elif event.key == pygame.K_a and event.mod & pygame.KMOD_CTRL:
                         self.highlightStartLine = 0
                         self.highlightEndLine = len(self.text)
                         self.highlightStartInline = 0
                         self.highlightEndInline = len(self.text[-1])
+                        self.highlight()
 
                     elif event.key == pygame.K_c and event.mod & pygame.KMOD_CTRL:
                         pass
@@ -192,67 +189,68 @@ class TextBox(WidgetBase):
                             self.addText(event.unicode)
 
     def handleBackspace(self):
-        if self.cursorPosition > 0:
-            line = self.text[self.selectedLine]
-            self.text[self.selectedLine] = line[:self.cursorPosition - 1] + line[self.cursorPosition:]
-            self.cursorPosition -= 1
+        if self.cursor.column > 0:
+            line = self.text[self.cursor.line]
+            self.text[self.cursor.line] = line[:self.cursor.column - 1] + line[self.cursor.column:]
+            self.cursor.column -= 1
             self._setOldRelativeCursorPosition()
             self.onTextChanged(*self.onTextChangedParams)
 
-        elif self.selectedLine > 0:
-            self.cursorPosition = len(self.text[self.selectedLine - 1])
-            self.text[self.selectedLine - 1] += self.text[self.selectedLine]
-            self.text.pop(self.selectedLine)
-            self.selectedLine -= 1
+        elif self.cursor.line > 0:
+            self.cursor.column = len(self.text[self.cursor.line - 1])
+            self.text[self.cursor.line - 1] += self.text[self.cursor.line]
+            self.text.pop(self.cursor.line)
+            self.cursor.line -= 1
             self._setOldRelativeCursorPosition()
             self.onTextChanged(*self.onTextChangedParams)
 
     def handleDelete(self):
-        if self.cursorPosition < len(self.text[self.selectedLine]):
+        if self.cursor.column < len(self.text[self.cursor.line]):
 
-            self.text[self.selectedLine] = \
-            self.text[self.selectedLine][:self.cursorPosition] 
-            + self.text[self.selectedLine][self.cursorPosition + 1:]
+            self.text[self.cursor.line] = (
+                self.text[self.cursor.line][:self.cursor.column] 
+                + self.text[self.cursor.line][self.cursor.column + 1:]
+            )
 
             self.onTextChanged(*self.onTextChangedParams)
         
-        elif self.selectedLine < len(self.text) - 1:
-            self.text[self.selectedLine] += self.text[self.selectedLine + 1]
-            self.text.pop(self.selectedLine + 1)
+        elif self.cursor.line < len(self.text) - 1:
+            self.text[self.cursor.line] += self.text[self.cursor.line + 1]
+            self.text.pop(self.cursor.line + 1)
             self.onTextChanged(*self.onTextChangedParams)
 
     def handleUp(self):
         visualLineIndex = self.getCurrentVisualLineIndex()
 
-        if visualLineIndex != -1 and visualLineIndex - 1 >= 0:
+        if visualLineIndex - 1 >= 0:
             visualLine = self.cachedVisualLines[visualLineIndex]
-            relativePosition = self.cursorPosition - visualLine['startAt']
+            relativePosition = self.cursor.column - visualLine['startAt']
 
             previousLine = self.cachedVisualLines[visualLineIndex - 1]
 
             if visualLine['lineIndex'] != previousLine['lineIndex']:
-                self.selectedLine -= 1
+                self.cursor.line -= 1
 
-            self.cursorPosition = max(previousLine['startAt'] + relativePosition,
-                                        previousLine['startAt'] + self.oldRelativeCursorPosition)
-            self.cursorPosition = min(self.cursorPosition,
+            self.cursor.column = max(previousLine['startAt'] + relativePosition,
+                                        previousLine['startAt'] + self.cursor.prefferedColumn)
+            self.cursor.column = min(self.cursor.column,
                                         previousLine['startAt'] + len(previousLine['text']))
             
     def handleDown(self):
         visualLineIndex = self.getCurrentVisualLineIndex()
 
-        if visualLineIndex != -1 and visualLineIndex + 1 < len(self.cachedVisualLines):
+        if visualLineIndex + 1 < len(self.cachedVisualLines):
             visualLine = self.cachedVisualLines[visualLineIndex]
-            relativePosition = self.cursorPosition - visualLine['startAt']
+            relativePosition = self.cursor.column - visualLine['startAt']
 
             nextLine = self.cachedVisualLines[visualLineIndex + 1]
 
             if visualLine['lineIndex'] != nextLine['lineIndex']:
-                self.selectedLine += 1
+                self.cursor.line += 1
 
-            self.cursorPosition = max(nextLine['startAt'] + relativePosition,
-                                        nextLine['startAt'] + self.oldRelativeCursorPosition)
-            self.cursorPosition = min(self.cursorPosition,
+            self.cursor.column = max(nextLine['startAt'] + relativePosition,
+                                        nextLine['startAt'] + self.cursor.prefferedColumn)
+            self.cursor.column = min(self.cursor.column,
                                         nextLine['startAt'] + len(nextLine['text']))
             
     def handleLeft(self):
@@ -261,39 +259,38 @@ class TextBox(WidgetBase):
             shiftPressed = False
             if event.mod & pygame.KMOD_SHIFT:
                 if self.isEmptyText(self.highlightedText):
-                    self.highlightStartLine = self.selectedLine
-                    self.highlightStartInline = self.cursorPosition
+                    self.highlightStartLine = self.cursor.line
+                    self.highlightStartInline = self.cursor.column
                 shiftPressed = True
             else:
                 self.resetHighlight()
 
-            if self.cursorPosition > 0:
+            if self.cursor.column > 0:
 
                 visualLineIndex = self.getCurrentVisualLineIndex()
 
-                if visualLineIndex != -1:
-                    visualLine = self.cachedVisualLines[visualLineIndex]
-                    relativePosition = self.cursorPosition - visualLine['startAt'] - 1
+                visualLine = self.cachedVisualLines[visualLineIndex]
+                relativePosition = self.cursor.column - visualLine['startAt'] - 1
 
-                    while relativePosition >= 0 and visualLine['text'][relativePosition] in ' ();:,./!?':
-                        relativePosition -= 1
+                while relativePosition >= 0 and visualLine['text'][relativePosition] in ' ();:,./!?':
+                    relativePosition -= 1
 
-                    while relativePosition >= 0 and visualLine['text'][relativePosition] not in ' ();:,./!?':
-                        relativePosition -= 1
-                    
-                    self.setCursorPosition(self.selectedLine, visualLine['startAt'] + relativePosition + 1)
+                while relativePosition >= 0 and visualLine['text'][relativePosition] not in ' ();:,./!?':
+                    relativePosition -= 1
+                
+                self.cursor.set(self.cursor.line, visualLine['startAt'] + relativePosition + 1, self.text)
 
-                    if shiftPressed:
-                        self.highlightEndLine = self.selectedLine
-                        self.highlightEndInline = self.cursorPosition
-                        self.highlight()
+                if shiftPressed:
+                    self.highlightEndLine = self.cursor.line
+                    self.highlightEndInline = self.cursor.column
+                    self.highlight()
 
-        elif self.cursorPosition == 0 and self.selectedLine - 1 >= 0:
-            self.selectedLine -= 1
-            self.cursorPosition = len(self.text[self.selectedLine])
+        elif self.cursor.column == 0 and self.cursor.line - 1 >= 0:
+            self.cursor.line -= 1
+            self.cursor.column = len(self.text[self.cursor.line])
             self.resetHighlight()
         else:
-            self.cursorPosition = max(self.cursorPosition - 1, 0)
+            self.cursor.column = max(self.cursor.column - 1, 0)
             self.resetHighlight()
 
         self._setOldRelativeCursorPosition()
@@ -304,40 +301,40 @@ class TextBox(WidgetBase):
             shiftPressed = False
             if event.mod & pygame.KMOD_SHIFT:
                 if self.isEmptyText(self.highlightedText):
-                    self.highlightStartLine = self.selectedLine
-                    self.highlightStartInline = self.cursorPosition
+                    self.highlightStartLine = self.cursor.line
+                    self.highlightStartInline = self.cursor.column
                 shiftPressed = True
             else:
                 self.resetHighlight()
 
-            if self.cursorPosition < len(self.text[self.selectedLine]):
+            if self.cursor.column < len(self.text[self.cursor.line]):
 
                 visualLineIndex = self.getCurrentVisualLineIndex()
 
-                if visualLineIndex != -1:
-                    visualLine = self.cachedVisualLines[visualLineIndex]
-                    relativePosition = self.cursorPosition - visualLine['startAt']
+                # if visualLineIndex != -1:
+                visualLine = self.cachedVisualLines[visualLineIndex]
+                relativePosition = self.cursor.column - visualLine['startAt']
 
-                    while relativePosition < len(visualLine['text']) and visualLine['text'][relativePosition] in ' ();:,./!?':
-                        relativePosition += 1
+                while relativePosition < len(visualLine['text']) and visualLine['text'][relativePosition] in ' ();:,./!?':
+                    relativePosition += 1
 
-                    while relativePosition < len(visualLine['text']) and visualLine['text'][relativePosition] not in ' ();:,./!?':
-                        relativePosition += 1
+                while relativePosition < len(visualLine['text']) and visualLine['text'][relativePosition] not in ' ();:,./!?':
+                    relativePosition += 1
 
-                    self.setCursorPosition(self.selectedLine, visualLine['startAt'] + relativePosition)
+                self.cursor.set(self.cursor.line, visualLine['startAt'] + relativePosition, self.text)
 
-                    if shiftPressed:
-                        self.highlightEndLine = self.selectedLine
-                        self.highlightEndInline = self.cursorPosition
-                        self.highlight()
+                if shiftPressed:
+                    self.highlightEndLine = self.cursor.line
+                    self.highlightEndInline = self.cursor.column
+                    self.highlight()
             
-        elif self.cursorPosition == len(self.text[self.selectedLine]) \
-            and self.selectedLine + 1 < len(self.text):
-            self.selectedLine += 1
-            self.cursorPosition = 0
+        elif self.cursor.column == len(self.text[self.cursor.line]) \
+            and self.cursor.line + 1 < len(self.text):
+            self.cursor.line += 1
+            self.cursor.column = 0
             self.resetHighlight()
         else:
-            self.cursorPosition = min(self.cursorPosition + 1, len(self.text[self.selectedLine]))
+            self.cursor.column = min(self.cursor.column + 1, len(self.text[self.cursor.line]))
             self.resetHighlight()
 
         self._setOldRelativeCursorPosition()
@@ -379,8 +376,8 @@ class TextBox(WidgetBase):
             textSurface = self.font.render(visualLine['text'], True, colour)
             self.win.blit(textSurface, (xBase, lineY))
 
-            if visualLine['lineIndex'] == self.selectedLine:
-                relativePosition = self.cursorPosition - visualLine['startAt']
+            if visualLine['lineIndex'] == self.cursor.line:
+                relativePosition = self.cursor.column - visualLine['startAt']
                 
                 if 0 <= relativePosition <= len(visualLine['text']):
                     textBeforeCursor = visualLine['text'][:relativePosition]
@@ -456,23 +453,23 @@ class TextBox(WidgetBase):
         text = text.replace('\r', '')
         lines = text.split('\n')
 
-        rightPart = self.text[self.selectedLine][self.cursorPosition:]
+        rightPart = self.text[self.cursor.line][self.cursor.column:]
 
         for i, line in enumerate(lines):
-            currentLine = self.text[self.selectedLine]
-            self.text[self.selectedLine] = currentLine[:self.cursorPosition] + line
-            self.cursorPosition += len(line)
+            currentLine = self.text[self.cursor.line]
+            self.text[self.cursor.line] = currentLine[:self.cursor.column] + line
+            self.cursor.column += len(line)
 
             if i != len(lines) - 1:
-                self.selectedLine += 1
-                self.cursorPosition = 0
-                self.text.insert(self.selectedLine, '')
+                self.cursor.line += 1
+                self.cursor.column = 0
+                self.text.insert(self.cursor.line, '')
 
             self.onTextChanged(*self.onTextChangedParams)
 
-        self.text[self.selectedLine] += rightPart
+        self.text[self.cursor.line] += rightPart
 
-        self.oldRelativeCursorPosition = self.cursorPosition
+        self.cursor.prefferedColumn = self.cursor.column
 
     def getVisualLines(self) -> list[dict]:
         """ Разбивает логические строки на визуальные с помощью font.size() """
@@ -516,10 +513,12 @@ class TextBox(WidgetBase):
         startLine = min(self.highlightStartLine, self.highlightEndLine)
         endLine = max(self.highlightStartLine, self.highlightEndLine)
 
-        if startLine == endLine:
-            startInLine = min(self.highlightStartInline, self.highlightEndInline)
-            endInLine = max(self.highlightStartInline, self.highlightEndInline)
-            self.highlightedText = [self.text[startLine][startInLine:endInLine]]
+        startInLine = self.highlightStartInline
+        endInLine = self.highlightEndInline
+        
+        if self.highlightStartLine > self.highlightEndLine or \
+           (self.highlightStartLine == self.highlightEndLine and self.highlightStartInline > self.highlightEndInline):
+            startInLine, endInLine = endInLine, startInLine
         
         self.highlightStartLine = startLine
         self.highlightEndLine = endLine
@@ -532,9 +531,10 @@ class TextBox(WidgetBase):
         self.highlightedText = ['']
     
     def getCurrentVisualLineIndex(self) -> int:
-        if self.cursorCoords:
-            return (self.cursorCoords[1] - self._y - self.textOffsetTop) // self.fontSize
-        return -1
+        for lineIndex, visualLine in enumerate(self.cachedVisualLines):
+            lineStartAt = visualLine['startAt']
+            if lineStartAt <= self.cursor.column <= lineStartAt + len(visualLine['text']):
+                return lineIndex
 
     def updateCursor(self) -> None:
         now = pygame.time.get_ticks()
@@ -552,26 +552,17 @@ class TextBox(WidgetBase):
 
     def setText(self, text: str) -> None:
         self.text = ['']
-        self.setCursorPosition(0, 0)
+        self.cursor.set(0, 0, self.text)
         self.addText(text)
         self.isChanged = True
-
-    def setCursorPosition(self, lineIndex: int, inLineIndex: int) -> None:
-        if 0 <= lineIndex <= len(self.text) - 1 \
-            and 0 <= inLineIndex <= len(self.text[lineIndex]):
-
-            self.selectedLine = lineIndex
-            self.cursorPosition = inLineIndex
-            self.oldRelativeCursorPosition = self._setOldRelativeCursorPosition()
 
     def _setOldRelativeCursorPosition(self) -> None:
         visualLineIndex = self.getCurrentVisualLineIndex()
 
-        if visualLineIndex != -1:
-            visualLine = self.cachedVisualLines[visualLineIndex]
-            relativePosition = self.cursorPosition - visualLine['startAt']
+        visualLine = self.cachedVisualLines[visualLineIndex]
+        relativePosition = self.cursor.column - visualLine['startAt']
 
-            self.oldRelativeCursorPosition = relativePosition
+        self.cursor.prefferedColumn = relativePosition
 
     def _setCursorPositionFromMouse(self, mouseX: int, mouseY: int):
         xBase = self._x + self.textOffsetLeft + self.borderThickness
@@ -581,25 +572,25 @@ class TextBox(WidgetBase):
             lineY = yBase + self.fontSize * i
 
             if lineY < mouseY < lineY + self.fontSize:
-                if visualLine['lineIndex'] != self.selectedLine:
-                    self.selectedLine = visualLine['lineIndex']
+                if visualLine['lineIndex'] != self.cursor.line:
+                    self.cursor.line = visualLine['lineIndex']
 
                 if len(visualLine['text']) == 0:
-                    self.cursorPosition = visualLine['startAt']
+                    self.cursor.column = visualLine['startAt']
                     break
 
                 firstLetter = visualLine['text'][0]
                 firstLetterWidth = self.font.size(firstLetter)[0]
 
                 if self._x <= mouseX < xBase + firstLetterWidth // 2:
-                    self.cursorPosition = visualLine['startAt']
+                    self.cursor.column = visualLine['startAt']
                     break
             
                 wholeLine = visualLine['text']
                 wholeLineWidth = self.font.size(wholeLine)[0]
 
                 if xBase + wholeLineWidth <= mouseX:
-                    self.cursorPosition = visualLine['startAt'] + len(visualLine['text'])
+                    self.cursor.column = visualLine['startAt'] + len(visualLine['text'])
                     break
 
                 count = 0
@@ -615,7 +606,7 @@ class TextBox(WidgetBase):
                     x2 = xBase + (self.font.size(textCurrent)[0] + self.font.size(textAfter)[0]) / 2
 
                     if x1 <= mouseX <= x2:
-                        self.cursorPosition = visualLine['startAt'] + count
+                        self.cursor.column = visualLine['startAt'] + count
                         break
 
                 break
@@ -623,6 +614,22 @@ class TextBox(WidgetBase):
     def getText(self) -> str:
         return '\n'.join(self.text)
 
+
+@dataclass
+class Cursor:
+    line: int = 0
+    column: int = 0
+    prefferedColumn: int = 0
+
+    def clamp(self, lines: list[str]) -> None:
+        self.line = max(0, min(self.line, len(lines) - 1))
+        self.column = max(0, min(self.column, len(lines[self.line])))
+
+    def set(self, line: int, column: int, lines: list[str]) -> None:
+        self.line = line
+        self.column = column
+        self.clamp(lines)
+        self.preferredColumn = self.column
 
 if __name__ == '__main__':
     def output():
