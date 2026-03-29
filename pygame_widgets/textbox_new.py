@@ -184,8 +184,8 @@ class TextBox(WidgetBase):
 
                     elif event.key == pygame.K_a and event.mod & pygame.KMOD_CTRL:
                         self.highlightStart.set(0, 0, self.text)
-                        self.highlightEnd.set(len(self.text), len(self.text[-1]), self.text)
-                        self.cursor.set(len(self.text), len(self.text[-1]), self.text)
+                        self.highlightEnd.set(len(self.text) - 1, len(self.text[-1]), self.text)
+                        self.cursor.set(len(self.text) - 1, len(self.text[-1]), self.text)
 
                     elif event.key == pygame.K_c and event.mod & pygame.KMOD_CTRL:
                         pass
@@ -208,17 +208,19 @@ class TextBox(WidgetBase):
 
     def handleBackspace(self) -> None:
         if self.cursor.column > 0:
-            line = self.text[self.cursor.line]
-            self.text[self.cursor.line] = line[:self.cursor.column - 1] + line[self.cursor.column:]
+            self.text[self.cursor.line] = (
+                self.text[self.cursor.line][:self.cursor.column - 1] +
+                self.text[self.cursor.line][self.cursor.column:]
+                )
             self.cursor.set(self.cursor.line, self.cursor.column - 1, self.text)
             self._setPreferredColumn()
             self.onTextChanged(*self.onTextChangedParams)
 
         elif self.cursor.line > 0:
-            self.cursor.set(self.cursor.line, len(self.text[self.cursor.line - 1]), self.text)
+            previousLineLength = len(self.text[self.cursor.line - 1])
             self.text[self.cursor.line - 1] += self.text[self.cursor.line]
             self.text.pop(self.cursor.line)
-            self.cursor.set(self.cursor.line - 1, self.cursor.column, self.text)
+            self.cursor.set(self.cursor.line - 1, previousLineLength, self.text)
             self._setPreferredColumn()
             self.onTextChanged(*self.onTextChangedParams)
 
@@ -274,82 +276,57 @@ class TextBox(WidgetBase):
             )
             
     def handleLeft(self, event: pygame.Event) -> None:
-        # TODO Shift highlighting without Ctrl
+        if self.isEmptyHighlight():
+            self.highlightStart.set(self.cursor.line, self.cursor.column, self.text)
+            self.highlightEnd.set(self.cursor.line, self.cursor.column, self.text)
+
         if event.mod & pygame.KMOD_CTRL:
+            if self.cursor.column == 0 and self.cursor.line > 0:
+                self.cursor.set(self.cursor.line - 1, len(self.text[self.cursor.line - 1]), self.text)
 
-            shiftPressed = False
-            if event.mod & pygame.KMOD_SHIFT:
-                if self.isEmptyHighlight():
-                    self.highlightStart.set(self.cursor.line, self.cursor.column, self.text)
-                shiftPressed = True
-            else:
-                self.resetHighlight()
-
-            if self.cursor.column > 0:
-
-                visualLineIndex = self.getCurrentVisualLineIndex()
-
-                if visualLineIndex != -1:
-                    visualLine = self.cachedVisualLines[visualLineIndex]
-                    relativeColumn = self.cursor.column - visualLine['startAt'] - 1
-
-                    while relativeColumn >= 0 and visualLine['text'][relativeColumn] in ' ();:,./!?':
-                        relativeColumn -= 1
-
-                    while relativeColumn >= 0 and visualLine['text'][relativeColumn] not in ' ();:,./!?':
-                        relativeColumn -= 1
+            while self.cursor.column - 1 >= 0 and self.text[self.cursor.line][self.cursor.column - 1] in ' ();:,./!?':
+                self.cursor.set(self.cursor.line, self.cursor.column - 1, self.text)
                     
-                    self.cursor.set(self.cursor.line, visualLine['startAt'] + relativeColumn + 1, self.text)
+            while self.cursor.column - 1 >= 0 and self.text[self.cursor.line][self.cursor.column - 1] not in ' ();:,./!?':
+                self.cursor.set(self.cursor.line, self.cursor.column - 1, self.text)
 
-                    if shiftPressed:
-                        self.highlightEnd.set(self.cursor.line, self.cursor.column, self.text)
-
-        elif self.cursor.column == 0 and self.cursor.line - 1 >= 0:
-            self.cursor.set(self.cursor.line - 1, len(self.text[self.cursor.line]), self.text)
-            self.resetHighlight()
+        elif self.cursor.column == 0 and self.cursor.line > 0:
+            self.cursor.set(self.cursor.line - 1, len(self.text[self.cursor.line - 1]), self.text)
         else:
             self.cursor.set(self.cursor.line, max(self.cursor.column - 1, 0), self.text)
+        
+        if event.mod & pygame.KMOD_SHIFT:
+            self.highlightEnd.set(self.cursor.line, self.cursor.column, self.text)
+        else:
             self.resetHighlight()
 
         self._setPreferredColumn()
 
     def handleRight(self, event: pygame.Event) -> None:
-        # TODO Shift highlighting without Ctrl
+        if self.isEmptyHighlight():
+            self.highlightStart.set(self.cursor.line, self.cursor.column, self.text)
+            self.highlightEnd.set(self.cursor.line, self.cursor.column, self.text)
+
         if event.mod & pygame.KMOD_CTRL:
+            if self.cursor.column == len(self.text[self.cursor.line]) \
+            and self.cursor.line + 1 < len(self.text):
+                self.cursor.set(self.cursor.line + 1, 0, self.text)
 
-            shiftPressed = False
-            if event.mod & pygame.KMOD_SHIFT:
-                if self.isEmptyHighlight():
-                    self.highlightStart.set(self.cursor.line, self.cursor.column, self.text)
-                shiftPressed = True
-            else:
-                self.resetHighlight()
+            while self.cursor.column < len(self.text[self.cursor.line]) and self.text[self.cursor.line][self.cursor.column] in ' ();:,./!?':
+                self.cursor.set(self.cursor.line, self.cursor.column + 1, self.text)
+                
+            while self.cursor.column < len(self.text[self.cursor.line]) and self.text[self.cursor.line][self.cursor.column] not in ' ();:,./!?':
+                self.cursor.set(self.cursor.line, self.cursor.column + 1, self.text)
 
-            if self.cursor.column < len(self.text[self.cursor.line]):
-
-                visualLineIndex = self.getCurrentVisualLineIndex()
-
-                if visualLineIndex != -1:
-                    visualLine = self.cachedVisualLines[visualLineIndex]
-                    relativeColumn = self.cursor.column - visualLine['startAt']
-
-                    while relativeColumn < len(visualLine['text']) and visualLine['text'][relativeColumn] in ' ();:,./!?':
-                        relativeColumn += 1
-
-                    while relativeColumn < len(visualLine['text']) and visualLine['text'][relativeColumn] not in ' ();:,./!?':
-                        relativeColumn += 1
-
-                    self.cursor.set(self.cursor.line, visualLine['startAt'] + relativeColumn, self.text)
-
-                    if shiftPressed:
-                        self.highlightEnd.set(self.cursor.line, self.cursor.column, self.text)
-            
         elif self.cursor.column == len(self.text[self.cursor.line]) \
             and self.cursor.line + 1 < len(self.text):
             self.cursor.set(self.cursor.line + 1, 0, self.text)
-            self.resetHighlight()
         else:
             self.cursor.set(self.cursor.line, self.cursor.column + 1, self.text)
+
+        if event.mod & pygame.KMOD_SHIFT:
+            self.highlightEnd.set(self.cursor.line, self.cursor.column, self.text)
+        else:
             self.resetHighlight()
 
         self._setPreferredColumn()
@@ -372,7 +349,6 @@ class TextBox(WidgetBase):
             self.cachedVisualLines = self.getVisualLines()
             self.isChanged = False
         
-        # Определяем, что именно мы рисуем (текст или плейсхолдер)
         if self.isEmptyText(self.text):
             displayLines = [{'text': self.placeholderText, 'lineIndex': 0, 'startAt': 0}]
             colour = self.placeholderTextColour
@@ -422,46 +398,55 @@ class TextBox(WidgetBase):
     def drawHighlight(self) -> None:
         if self.isEmptyHighlight():
             return
-
-        startLine = min(self.highlightStart.line, self.highlightEnd.line)
-        endLine = max(self.highlightStart.line, self.highlightEnd.line)
-
-        startColumn = self.highlightStart.column
-        endColumn = self.highlightEnd.column
         
-        if self.highlightStart.line > self.highlightEnd.line or \
-           (self.highlightStart.line == self.highlightEnd.line and self.highlightStart.column > self.highlightEnd.column):
-            startColumn, endColumn = endColumn, startColumn
+        start = self.highlightStart
+        end = self.highlightEnd
+
+        if (start.line, start.column) > (end.line, end.column):
+            start, end = end, start
 
         for i, visualLine in enumerate(self.cachedVisualLines):
             lineIndex = visualLine['lineIndex']
+
+            if not (start.line <= lineIndex <= end.line):
+                continue
             
-            if startLine <= lineIndex <= endLine:
-                lineY = self._actualY + self.fontSize * i
-                
-                lineStart = visualLine['startAt']
-                
-                # Вычисляем границы выделения конкретно для этой логической строки
-                highlightStart = startColumn if lineIndex == startLine else 0
-                highlightEnd = endColumn if lineIndex == endLine else len(self.text[lineIndex])
-                
-                # Ограничиваем эти границы рамками текущего визуального куска
-                localStart = max(0, highlightStart - lineStart)
-                localEnd = min(len(visualLine['text']), highlightEnd - lineStart)
-                
-                # if localStart < localEnd:
-                textBefore = visualLine['text'][:localStart]
-                textHighlight = visualLine['text'][localStart:localEnd]
+            lineY = self._actualY + self.fontSize * i
+            
+            lineStart = visualLine['startAt']
+            
+            highlightStart = start.column if lineIndex == start.line else 0
+            highlightEnd = end.column if lineIndex == end.line else len(self.text[lineIndex])
+            
+            localStart = max(0, highlightStart - lineStart)
+            localEnd = min(len(visualLine['text']), highlightEnd - lineStart)
 
-                textBeforeWidth = self.font.size(textBefore)[0]
-                textWidth = self.font.size(textHighlight)[0]
+            if localStart > localEnd:
+                continue
+            
+            isEmptyLine = len(self.text[lineIndex]) == 0
+            
+            isEndOfLogicalLine = (
+                lineIndex < end.line and 
+                localEnd == len(visualLine['text']) and 
+                visualLine['startAt'] + len(visualLine['text']) == len(self.text[lineIndex])
+            )
 
-                if textHighlight == '':
-                    textWidth = self.font.size(' ')[0]
-                
-                pygame.draw.rect(self.win, self.highlightColour,
-                                    (self._actualX + textBeforeWidth, lineY, textWidth, self.fontSize))
-    
+            if localStart == localEnd and not (isEmptyLine or isEndOfLogicalLine):
+                continue
+            
+            textBefore = visualLine['text'][:localStart]
+            textHighlight = visualLine['text'][localStart:localEnd]
+
+            textBeforeWidth = self.font.size(textBefore)[0]
+            textWidth = self.font.size(textHighlight)[0]
+
+            if isEmptyLine or isEndOfLogicalLine:
+                textWidth += self.font.size(' ')[0]
+            
+            pygame.draw.rect(self.win, self.highlightColour,
+                                (self._actualX + textBeforeWidth, lineY, textWidth, self.fontSize))
+
     def addText(self, text: str) -> None:
         text = text.replace('\t', ' ' * self.tabSpaces)
         text = text.replace('\r', '')
@@ -525,14 +510,16 @@ class TextBox(WidgetBase):
         self.highlightStart.set(self.cursor.line, self.cursor.column, self.text)
         self.highlightEnd.set(self.cursor.line, self.cursor.column, self.text)
     
-    def getCurrentVisualLineIndex(self) -> int:
+    def getCurrentVisualLineIndex(self) -> int: 
         for lineIndex, visualLine in enumerate(self.cachedVisualLines):
             if visualLine['lineIndex'] != self.cursor.line:
                 continue
             lineWidth = visualLine['startAt'] + len(visualLine['text'])
             if visualLine['startAt'] <= self.cursor.column <= lineWidth:
-                # if self.cursor.column == lineWidth != 0 and lineIndex + 1 < len(self.cachedVisualLines):
-                #     return lineIndex + 1
+                if self.cursor.column == lineWidth != 0 \
+                and lineIndex + 1 < len(self.cachedVisualLines) \
+                and self.cachedVisualLines[lineIndex + 1]['lineIndex'] == self.cursor.line:
+                    return lineIndex + 1
                 return lineIndex
         return -1
 
@@ -546,8 +533,8 @@ class TextBox(WidgetBase):
         return len(text) == 1 and text[0] == ''
     
     def isEmptyHighlight(self) -> bool:
-        return (self.highlightStart.line == self.highlightEnd.line and 
-                self.highlightStart.column == self.highlightEnd.column)
+        return (self.highlightStart.line, self.highlightStart.column) == \
+                (self.highlightEnd.line, self.highlightEnd.column)
     
     def escape(self) -> None:
         self.selected = False
@@ -557,6 +544,7 @@ class TextBox(WidgetBase):
     def setText(self, text: str) -> None:
         self.text = ['']
         self.cursor.set(0, 0, self.text)
+        self.resetHighlight()
         self.addText(text)
         self.isChanged = True
 
@@ -584,7 +572,7 @@ class TextBox(WidgetBase):
                 firstLetter = visualLine['text'][0]
                 firstLetterWidth = self.font.size(firstLetter)[0]
 
-                if self._x <= mouseX < self._actualX + firstLetterWidth // 2:
+                if self._actualX <= mouseX < self._actualX + firstLetterWidth // 2:
                     self.cursor.set(self.cursor.line, visualLine['startAt'], self.text)
                     break
             
@@ -622,7 +610,7 @@ class TextBox(WidgetBase):
 
         if (start.line, start.column) > (end.line, end.column):
             start, end = end, start
-
+                    
         if start.line == end.line:
             return self.text[start.line][start.column:end.column]
 
@@ -640,8 +628,9 @@ class TextBox(WidgetBase):
 
 if __name__ == '__main__':
     def output():
-        print(textbox.getText())
-        textbox.setText('')
+        print(textbox.getHighlightedText())
+        # print(textbox.getText())
+        # textbox.setText('')
     
     pygame.init()    
     win = pygame.display.set_mode((1000, 600))
