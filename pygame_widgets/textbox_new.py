@@ -274,6 +274,7 @@ class TextBox(WidgetBase):
             )
             
     def handleLeft(self, event: pygame.Event) -> None:
+        # TODO Shift highlighting without Ctrl
         if event.mod & pygame.KMOD_CTRL:
 
             shiftPressed = False
@@ -313,6 +314,7 @@ class TextBox(WidgetBase):
         self._setPreferredColumn()
 
     def handleRight(self, event: pygame.Event) -> None:
+        # TODO Shift highlighting without Ctrl
         if event.mod & pygame.KMOD_CTRL:
 
             shiftPressed = False
@@ -615,7 +617,25 @@ class TextBox(WidgetBase):
         return '\n'.join(self.text)
     
     def getHighlightedText(self) -> str:
-        pass
+        start = self.highlightStart
+        end = self.highlightEnd
+
+        if (start.line, start.column) > (end.line, end.column):
+            start, end = end, start
+
+        if start.line == end.line:
+            return self.text[start.line][start.column:end.column]
+
+        result = []
+
+        result.append(self.text[start.line][start.column:])
+
+        for line in self.text[start.line + 1:end.line]:
+            result.append(line)
+
+        result.append(self.text[end.line][:end.column])
+
+        return '\n'.join(result)
 
 
 if __name__ == '__main__':
