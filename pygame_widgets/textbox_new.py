@@ -1,3 +1,5 @@
+import pyperclip
+
 import pygame
 import pygame_widgets
 from pygame_widgets.widget import WidgetBase
@@ -204,13 +206,16 @@ class TextBox(WidgetBase):
                         )
 
                     elif event.key == pygame.K_c and event.mod & pygame.KMOD_CTRL:
-                        pass
+                        self.copyHighlightedText()
 
                     elif event.key == pygame.K_v and event.mod & pygame.KMOD_CTRL:
-                        pass
+                        text = pyperclip.paste()
+                        if text:
+                            self.addText(text)
 
                     elif event.key == pygame.K_x and event.mod & pygame.KMOD_CTRL:
-                        pass
+                        self.copyHighlightedText()
+                        self.eraseHighlightedText()
 
                     elif event.key == pygame.K_INSERT:
                         self.insertOn = not self.insertOn  # TODO: add insert logic
@@ -694,6 +699,10 @@ class TextBox(WidgetBase):
 
     def isEmptyText(self, text: list[str]) -> bool:
         return len(text) == 1 and text[0] == ''
+
+    def copyHighlightedText(self) -> None:
+        if not self.isEmptyHighlight():
+            pyperclip.copy(self.getHighlightedText())
 
     def isEmptyHighlight(self) -> bool:
         return (self.highlightStart.line, self.highlightStart.column) == (
