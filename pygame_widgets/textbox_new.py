@@ -94,9 +94,9 @@ class TextBox(WidgetBase):
         self.borderColour = kwargs.get('borderColour', (0, 0, 0))
         self.radius = kwargs.get('radius', 0)
 
-        self.highlightStart = Cursor()
-        self.highlightEnd = Cursor()
-        self.highlightColour = kwargs.get('highlightColour', (166, 210, 255))
+        self.selectionStart = Cursor()
+        self.selectionEnd = Cursor()
+        self.selectionColour = kwargs.get('selectionColour', (166, 210, 255))
 
         # Callback
         self.onSubmit = kwargs.get('onSubmit', lambda *args: None)
@@ -141,7 +141,7 @@ class TextBox(WidgetBase):
                 self.cursorTime = pygame.time.get_ticks()
 
                 self._setColumnFromMouse(x, y)
-                self.resetHighlight()
+                self.resetSelection()
                 self._setPreferredColumn()
 
                 pygame.key.set_repeat(self.REPEAT_DELAY, self.REPEAT_INTERVAL)
@@ -152,7 +152,7 @@ class TextBox(WidgetBase):
             self.cursorTime = pygame.time.get_ticks()
 
             self._setColumnFromMouse(x, y)
-            self.highlightEnd.set(self.cursor.line, self.cursor.column, self.text)
+            self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
             self._setPreferredColumn()
 
         # Keyboard Input
@@ -214,8 +214,8 @@ class TextBox(WidgetBase):
                         self._handleEnd(event)
 
                     elif event.key == pygame.K_a and event.mod & pygame.KMOD_CTRL:
-                        self.highlightStart.set(0, 0, self.text)
-                        self.highlightEnd.set(
+                        self.selectionStart.set(0, 0, self.text)
+                        self.selectionEnd.set(
                             len(self.text) - 1, len(self.text[-1]), self.text
                         )
                         self.cursor.set(
@@ -223,7 +223,7 @@ class TextBox(WidgetBase):
                         )
 
                     elif event.key == pygame.K_c and event.mod & pygame.KMOD_CTRL:
-                        self.copyHighlightedText()
+                        self.copySelectedText()
 
                     elif event.key == pygame.K_v and event.mod & pygame.KMOD_CTRL:
                         text = pyperclip.paste()
@@ -231,8 +231,8 @@ class TextBox(WidgetBase):
                             self.addText(text)
 
                     elif event.key == pygame.K_x and event.mod & pygame.KMOD_CTRL:
-                        self.copyHighlightedText()
-                        self.eraseHighlightedText()
+                        self.copySelectedText()
+                        self.eraseSelectedText()
 
                     elif event.key == pygame.K_INSERT:
                         self.insertOn = not self.insertOn  # TODO: add insert logic
@@ -245,17 +245,17 @@ class TextBox(WidgetBase):
                             self.addText(event.unicode)
 
     def _handleBackspace(self, event: pygame.Event) -> None:
-        if not self.isEmptyHighlight():
-            self.eraseHighlightedText()
+        if not self.isEmptySelection():
+            self.eraseSelectedText()
 
         elif event.mod & pygame.KMOD_CTRL:
-            # This is necessary in order to set the start of the highlighting at the point
-            if self.isEmptyHighlight():
-                self.resetHighlight()
+            # This is necessary in order to set the start of the selection at the point
+            if self.isEmptySelection():
+                self.resetSelection()
 
             self._moveCursorWordLeft()
-            self.highlightEnd.set(self.cursor.line, self.cursor.column, self.text)
-            self.eraseHighlightedText()
+            self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
+            self.eraseSelectedText()
 
         elif self.cursor.column > 0:
             self.text[self.cursor.line] = (
@@ -279,16 +279,16 @@ class TextBox(WidgetBase):
             self.onTextChanged(*self.onTextChangedParams)
 
     def _handleDelete(self, event: pygame.Event) -> None:
-        if not self.isEmptyHighlight():
-            self.eraseHighlightedText()
+        if not self.isEmptySelection():
+            self.eraseSelectedText()
 
         elif event.mod & pygame.KMOD_CTRL:
-            if self.isEmptyHighlight():
-                self.resetHighlight()
+            if self.isEmptySelection():
+                self.resetSelection()
 
             self._moveCursorWordRight()
-            self.highlightEnd.set(self.cursor.line, self.cursor.column, self.text)
-            self.eraseHighlightedText()
+            self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
+            self.eraseSelectedText()
 
         elif self.cursor.column < len(self.text[self.cursor.line]):
 
@@ -310,7 +310,7 @@ class TextBox(WidgetBase):
             self.onTextChanged(*self.onTextChangedParams)
 
     def _handleUp(self) -> None:
-        self.resetHighlight()
+        self.resetSelection()
 
         visualLineIndex = self.getCurrentVisualLineIndex()
 
@@ -334,7 +334,7 @@ class TextBox(WidgetBase):
                 self._setPreferredColumn()
 
     def _handleDown(self) -> None:
-        self.resetHighlight()
+        self.resetSelection()
 
         visualLineIndex = self.getCurrentVisualLineIndex()
 
@@ -361,8 +361,8 @@ class TextBox(WidgetBase):
                 self._setPreferredColumn()
 
     def _handleLeft(self, event: pygame.Event) -> None:
-        if self.isEmptyHighlight():
-            self.resetHighlight()
+        if self.isEmptySelection():
+            self.resetSelection()
 
         if event.mod & pygame.KMOD_CTRL:
             self._moveCursorWordLeft()
@@ -375,15 +375,15 @@ class TextBox(WidgetBase):
             self.cursor.set(self.cursor.line, max(self.cursor.column - 1, 0), self.text)
 
         if event.mod & pygame.KMOD_SHIFT:
-            self.highlightEnd.set(self.cursor.line, self.cursor.column, self.text)
+            self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
         else:
-            self.resetHighlight()
+            self.resetSelection()
 
         self._setPreferredColumn()
 
     def _handleRight(self, event: pygame.Event) -> None:
-        if self.isEmptyHighlight():
-            self.resetHighlight()
+        if self.isEmptySelection():
+            self.resetSelection()
 
         if event.mod & pygame.KMOD_CTRL:
             self._moveCursorWordRight()
@@ -396,21 +396,21 @@ class TextBox(WidgetBase):
             self.cursor.set(self.cursor.line, self.cursor.column + 1, self.text)
 
         if event.mod & pygame.KMOD_SHIFT:
-            self.highlightEnd.set(self.cursor.line, self.cursor.column, self.text)
+            self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
         else:
-            self.resetHighlight()
+            self.resetSelection()
 
         self._setPreferredColumn()
 
     def _handleHome(self, event: pygame.Event) -> None:
-        if self.isEmptyHighlight():
-            self.resetHighlight()
+        if self.isEmptySelection():
+            self.resetSelection()
 
         if event.mod & pygame.KMOD_CTRL:
             self.cursor.set(0, 0, self.text)
             
             if event.mod & pygame.KMOD_SHIFT:
-                self.highlightEnd.set(self.cursor.line, self.cursor.column, self.text)
+                self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
 
         else:
             visualLineIndex = self.getCurrentVisualLineIndex()
@@ -420,17 +420,17 @@ class TextBox(WidgetBase):
                 self.cursor.set(self.cursor.line, visualLine['startAt'], self.text)
                 self._setPreferredColumn()
 
-            self.resetHighlight()
+            self.resetSelection()
 
     def _handleEnd(self, event: pygame.Event) -> None:
-        if self.isEmptyHighlight():
-            self.resetHighlight()
+        if self.isEmptySelection():
+            self.resetSelection()
 
         if event.mod & pygame.KMOD_CTRL:
             self.cursor.set(len(self.text) - 1, len(self.text[-1]), self.text)
             
             if event.mod & pygame.KMOD_SHIFT:
-                self.highlightEnd.set(self.cursor.line, self.cursor.column, self.text)
+                self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
         else:
             visualLineIndex = self.getCurrentVisualLineIndex()
 
@@ -443,7 +443,7 @@ class TextBox(WidgetBase):
                 )
                 self._setPreferredColumn()
 
-            self.resetHighlight()
+            self.resetSelection()
 
     def draw(self) -> None:
         '''Display to surface'''
@@ -453,7 +453,7 @@ class TextBox(WidgetBase):
             self.updateCursor()
         self._drawBorder()
         self._drawBackground()
-        self._drawHighlight()
+        self._drawSelection()
         self._drawText()
         self._drawCursor()
 
@@ -469,9 +469,10 @@ class TextBox(WidgetBase):
 
         for i, visualLine in enumerate(displayLines):
             lineY = self._actualY + i * self.fontSize
+            lineBottom = lineY + self.fontSize
 
-            if lineY + self.fontSize > self._actualY + self._actualHeight:
-                if lineY + self.fontSize < self._maxHeight:
+            if lineBottom > self._actualY + self._actualHeight:
+                if lineBottom < self._maxHeight:
                     self._height += self.fontSize
                     self._actualHeight += self.fontSize
                 else:
@@ -521,11 +522,11 @@ class TextBox(WidgetBase):
         )
         pygame.draw.rect(self.win, self.colour, rect, border_radius=self.radius)
 
-    def _drawHighlight(self) -> None:
-        if self.isEmptyHighlight():
+    def _drawSelection(self) -> None:
+        if self.isEmptySelection():
             return
 
-        start, end = self.getNormalizedHighlight()
+        start, end = self.getNormalizedSelection()
 
         for i, visualLine in enumerate(self.cachedVisualLines):
             lineIndex = visualLine['lineIndex']
@@ -537,13 +538,13 @@ class TextBox(WidgetBase):
 
             lineStart = visualLine['startAt']
 
-            highlightStart = start.column if lineIndex == start.line else 0
-            highlightEnd = (
+            selectionStart = start.column if lineIndex == start.line else 0
+            selectionEnd = (
                 end.column if lineIndex == end.line else len(self.text[lineIndex])
             )
 
-            localStart = max(0, highlightStart - lineStart)
-            localEnd = min(len(visualLine['text']), highlightEnd - lineStart)
+            localStart = max(0, selectionStart - lineStart)
+            localEnd = min(len(visualLine['text']), selectionEnd - lineStart)
 
             if localStart > localEnd:
                 continue
@@ -573,13 +574,13 @@ class TextBox(WidgetBase):
 
             pygame.draw.rect(
                 self.win,
-                self.highlightColour,
+                self.selectionColour,
                 (self._actualX + textBeforeWidth, lineY, textWidth, self.fontSize),
             )
 
     def addText(self, text: str) -> None:
-        if not self.isEmptyHighlight():
-            self.eraseHighlightedText()
+        if not self.isEmptySelection():
+            self.eraseSelectedText()
 
         text = text.replace('\t', ' ' * self.tabSpaces)
         text = text.replace('\r', '')
@@ -603,8 +604,8 @@ class TextBox(WidgetBase):
         self._setPreferredColumn()
         self.onTextChanged(*self.onTextChangedParams)
 
-    def eraseHighlightedText(self) -> None:
-        start, end = self.getNormalizedHighlight()
+    def eraseSelectedText(self) -> None:
+        start, end = self.getNormalizedSelection()
 
         if start.line == end.line:
             self.text[start.line] = (
@@ -619,15 +620,15 @@ class TextBox(WidgetBase):
             del self.text[start.line + 1 : end.line + 1]
 
         self.cursor.set(start.line, start.column, self.text)
-        self.resetHighlight()
+        self.resetSelection()
 
         self._setVisualLines()
         self._setPreferredColumn()
         self.onTextChanged(*self.onTextChangedParams)
 
-    def getNormalizedHighlight(self) -> tuple[Cursor, Cursor]:
-        start = self.highlightStart
-        end = self.highlightEnd
+    def getNormalizedSelection(self) -> tuple[Cursor, Cursor]:
+        start = self.selectionStart
+        end = self.selectionEnd
 
         if (start.line, start.column) > (end.line, end.column):
             start, end = end, start
@@ -698,9 +699,9 @@ class TextBox(WidgetBase):
                     )
                     start = end
 
-    def resetHighlight(self) -> None:
-        self.highlightStart.set(self.cursor.line, self.cursor.column, self.text)
-        self.highlightEnd.set(self.cursor.line, self.cursor.column, self.text)
+    def resetSelection(self) -> None:
+        self.selectionStart.set(self.cursor.line, self.cursor.column, self.text)
+        self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
 
     def getCurrentVisualLineIndex(self) -> int:
         for lineIndex, visualLine in enumerate(self.cachedVisualLines):
@@ -727,26 +728,26 @@ class TextBox(WidgetBase):
     def isEmptyText(self, text: list[str]) -> bool:
         return len(text) == 1 and text[0] == ''
 
-    def copyHighlightedText(self) -> None:
-        if not self.isEmptyHighlight():
-            pyperclip.copy(self.getHighlightedText())
+    def copySelectedText(self) -> None:
+        if not self.isEmptySelection():
+            pyperclip.copy(self.getSelectedText())
 
-    def isEmptyHighlight(self) -> bool:
-        return (self.highlightStart.line, self.highlightStart.column) == (
-            self.highlightEnd.line,
-            self.highlightEnd.column,
+    def isEmptySelection(self) -> bool:
+        return (self.selectionStart.line, self.selectionStart.column) == (
+            self.selectionEnd.line,
+            self.selectionEnd.column,
         )
 
     def escape(self) -> None:
         self.selected = False
         self.showCursor = False
-        self.resetHighlight()
+        self.resetSelection()
         pygame.key.set_repeat(*self.originalRepeat)
 
     def setText(self, text: str) -> None:
         self.text = ['']
         self.cursor.set(0, 0, self.text)
-        self.resetHighlight()
+        self.resetSelection()
         self.addText(text)
 
     def _setPreferredColumn(self) -> None:
@@ -871,8 +872,8 @@ class TextBox(WidgetBase):
     def getText(self) -> str:
         return '\n'.join(self.text)
 
-    def getHighlightedText(self) -> str:
-        start, end = self.getNormalizedHighlight()
+    def getSelectedText(self) -> str:
+        start, end = self.getNormalizedSelection()
 
         if start.line == end.line:
             return self.text[start.line][start.column : end.column]
