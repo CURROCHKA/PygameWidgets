@@ -122,6 +122,8 @@ class TextBox(WidgetBase):
                 self.cursorTime = pygame.time.get_ticks()
 
                 self._setColumnFromMouse(x, y)
+                self.resetHighlight()
+                self._setPreferredColumn()
 
                 pygame.key.set_repeat(self.REPEAT_DELAY, self.REPEAT_INTERVAL)
             else:
@@ -129,7 +131,10 @@ class TextBox(WidgetBase):
 
         elif mouseState == MouseState.DRAG and self.contains(x, y):
             self.cursorTime = pygame.time.get_ticks()
+
             self._setColumnFromMouse(x, y)
+            self.highlightEnd.set(self.cursor.line, self.cursor.column, self.text)
+            self._setPreferredColumn()
 
         # Keyboard Input
         if self.selected:
@@ -358,8 +363,7 @@ class TextBox(WidgetBase):
 
     def _handleLeft(self, event: pygame.Event) -> None:
         if self.isEmptyHighlight():
-            self.highlightStart.set(self.cursor.line, self.cursor.column, self.text)
-            self.highlightEnd.set(self.cursor.line, self.cursor.column, self.text)
+            self.resetHighlight()
 
         if event.mod & pygame.KMOD_CTRL:
             if self.cursor.column == 0 and self.cursor.line > 0:
@@ -397,8 +401,7 @@ class TextBox(WidgetBase):
 
     def _handleRight(self, event: pygame.Event) -> None:
         if self.isEmptyHighlight():
-            self.highlightStart.set(self.cursor.line, self.cursor.column, self.text)
-            self.highlightEnd.set(self.cursor.line, self.cursor.column, self.text)
+            self.resetHighlight()
 
         if event.mod & pygame.KMOD_CTRL:
             if self.cursor.column == len(
@@ -764,6 +767,12 @@ class TextBox(WidgetBase):
                     if x1 <= mouseX <= x2:
                         self.cursor.set(
                             self.cursor.line, visualLine["startAt"] + count, self.text
+                        )
+                        break
+
+                    if mouseX < self._actualX:
+                        self.cursor.set(
+                            self.cursor.line, visualLine["startAt"], self.text
                         )
                         break
 
