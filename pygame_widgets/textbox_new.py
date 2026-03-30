@@ -47,14 +47,14 @@ class TextBox(WidgetBase):
 
         # Widget state
         self.selected = False
-        self.isLabel = kwargs.get("isLabel", False)
+        self.readOnly = kwargs.get("readOnly", False)
         self.originalRepeat = pygame.key.get_repeat()
 
         # Cursor state and style
         self.cursor = Cursor()
         self.cursorWidth = kwargs.get("cursorWidth", 2)
         self.cursorColour = kwargs.get("cursorColour", (0, 0, 0))
-        self.showCursor = not self.isLabel
+        self.showCursor = not self.readOnly
         self.cursorTime = 0
 
         # Text state
@@ -264,12 +264,15 @@ class TextBox(WidgetBase):
                     elif event.key == pygame.K_ESCAPE:
                         self.escape()
 
-                    elif not self.isLabel:
+                    elif not self.readOnly:
                         if event.unicode:
                             self.addText(event.unicode)
 
     def _handleBackspace(self) -> None:
-        if self.cursor.column > 0:
+        if not self.isEmptyHighlight():
+            self.eraseHighlightedText()
+
+        elif self.cursor.column > 0:
             self.text[self.cursor.line] = (
                 self.text[self.cursor.line][: self.cursor.column - 1]
                 + self.text[self.cursor.line][self.cursor.column :]
@@ -291,7 +294,10 @@ class TextBox(WidgetBase):
             self.onTextChanged(*self.onTextChangedParams)
 
     def _handleDelete(self) -> None:
-        if self.cursor.column < len(self.text[self.cursor.line]):
+        if not self.isEmptyHighlight():
+            self.eraseHighlightedText()
+
+        elif self.cursor.column < len(self.text[self.cursor.line]):
 
             self.text[self.cursor.line] = (
                 self.text[self.cursor.line][: self.cursor.column]
@@ -362,6 +368,7 @@ class TextBox(WidgetBase):
                 self._setPreferredColumn()
 
     def _handleLeft(self, event: pygame.Event) -> None:
+        # This is necessary in order to set the start of the highlighting at the point
         if self.isEmptyHighlight():
             self.resetHighlight()
 
@@ -400,6 +407,7 @@ class TextBox(WidgetBase):
         self._setPreferredColumn()
 
     def _handleRight(self, event: pygame.Event) -> None:
+        # This is necessary in order to set the start of the highlighting at the point
         if self.isEmptyHighlight():
             self.resetHighlight()
 
@@ -508,11 +516,7 @@ class TextBox(WidgetBase):
         if self.isEmptyHighlight():
             return
 
-        start = self.highlightStart
-        end = self.highlightEnd
-
-        if (start.line, start.column) > (end.line, end.column):
-            start, end = end, start
+        start, end = self.getNormalizedHighlight()
 
         for i, visualLine in enumerate(self.cachedVisualLines):
             lineIndex = visualLine["lineIndex"]
@@ -563,6 +567,9 @@ class TextBox(WidgetBase):
             )
 
     def addText(self, text: str) -> None:
+        if not self.isEmptyHighlight():
+            self.eraseHighlightedText()
+
         text = text.replace("\t", " " * self.tabSpaces)
         text = text.replace("\r", "")
         lines = text.split("\n")
@@ -579,12 +586,42 @@ class TextBox(WidgetBase):
                 self.text.insert(self.cursor.line + 1, "")
                 self.cursor.set(self.cursor.line + 1, 0, self.text)
 
-            self.onTextChanged(*self.onTextChangedParams)
-
         self.text[self.cursor.line] += rightPart
 
         self._setVisualLines()
         self._setPreferredColumn()
+        self.onTextChanged(*self.onTextChangedParams)
+
+    def eraseHighlightedText(self) -> None:
+        start, end = self.getNormalizedHighlight()
+
+        if start.line == end.line:
+            self.text[start.line] = (
+                self.text[start.line][: start.column]
+                + self.text[start.line][end.column :]
+            )
+        else:
+            self.text[start.line] = (
+                self.text[start.line][: start.column]
+                + self.text[end.line][end.column :]
+            )
+            del self.text[start.line + 1 : end.line + 1]
+
+        self.cursor.set(start.line, start.column, self.text)
+        self.resetHighlight()
+
+        self._setVisualLines()
+        self._setPreferredColumn()
+        self.onTextChanged(*self.onTextChangedParams)
+
+    def getNormalizedHighlight(self) -> tuple[Cursor, Cursor]:
+        start = self.highlightStart
+        end = self.highlightEnd
+
+        if (start.line, start.column) > (end.line, end.column):
+            start, end = end, start
+
+        return start, end
 
     def _setVisualLines(self) -> None:
         self.cachedVisualLines = []
@@ -782,11 +819,7 @@ class TextBox(WidgetBase):
         return "\n".join(self.text)
 
     def getHighlightedText(self) -> str:
-        start = self.highlightStart
-        end = self.highlightEnd
-
-        if (start.line, start.column) > (end.line, end.column):
-            start, end = end, start
+        start, end = self.getNormalizedHighlight()
 
         if start.line == end.line:
             return self.text[start.line][start.column : end.column]
