@@ -191,6 +191,10 @@ class TextBox(WidgetBase):
                         pygame.K_HOME,
                         pygame.K_KP_7 if not event.mod & pygame.KMOD_NUM else -1,
                     ]:
+                        if self.isEmptyHighlight():
+                            self.highlightStart.set(self.cursor.line, self.cursor.column, self.text)
+                            self.highlightEnd.set(self.cursor.line, self.cursor.column, self.text)
+
                         visualLineIndex = self.getCurrentVisualLineIndex()
 
                         if visualLineIndex != -1:
@@ -200,10 +204,19 @@ class TextBox(WidgetBase):
                             )
                             self._setPreferredColumn()
 
+                        if event.mod & pygame.KMOD_SHIFT:
+                            self.highlightEnd.set(self.cursor.line, self.cursor.column, self.text)
+                        else:
+                            self.resetHighlight()
+
                     elif event.key in [
                         pygame.K_END,
                         pygame.K_KP_1 if not event.mod & pygame.KMOD_NUM else -1,
                     ]:
+                        if self.isEmptyHighlight():
+                            self.highlightStart.set(self.cursor.line, self.cursor.column, self.text)
+                            self.highlightEnd.set(self.cursor.line, self.cursor.column, self.text)
+
                         visualLineIndex = self.getCurrentVisualLineIndex()
 
                         if visualLineIndex != -1:
@@ -214,6 +227,11 @@ class TextBox(WidgetBase):
                                 self.text,
                             )
                             self._setPreferredColumn()
+
+                        if event.mod & pygame.KMOD_SHIFT:
+                            self.highlightEnd.set(self.cursor.line, self.cursor.column, self.text)
+                        else:
+                            self.resetHighlight()
 
                     elif event.key == pygame.K_a and event.mod & pygame.KMOD_CTRL:
                         self.highlightStart.set(0, 0, self.text)
@@ -277,6 +295,8 @@ class TextBox(WidgetBase):
             self.onTextChanged(*self.onTextChangedParams)
 
     def handleUp(self) -> None:
+        self.resetHighlight()
+
         visualLineIndex = self.getCurrentVisualLineIndex()
 
         if visualLineIndex - 1 >= 0:
@@ -295,6 +315,8 @@ class TextBox(WidgetBase):
             )
 
     def handleDown(self) -> None:
+        self.resetHighlight()
+
         visualLineIndex = self.getCurrentVisualLineIndex()
 
         if visualLineIndex != -1 and visualLineIndex + 1 < len(self.cachedVisualLines):
@@ -327,14 +349,13 @@ class TextBox(WidgetBase):
 
             while (
                 self.cursor.column - 1 >= 0
-                and self.text[self.cursor.line][self.cursor.column - 1] in ' ();:,./!?'
+                and not self.text[self.cursor.line][self.cursor.column - 1].isalnum()
             ):
                 self.cursor.set(self.cursor.line, self.cursor.column - 1, self.text)
 
             while (
                 self.cursor.column - 1 >= 0
-                and self.text[self.cursor.line][self.cursor.column - 1]
-                not in ' ();:,./!?'
+                and self.text[self.cursor.line][self.cursor.column - 1].isalnum()
             ):
                 self.cursor.set(self.cursor.line, self.cursor.column - 1, self.text)
 
@@ -365,13 +386,13 @@ class TextBox(WidgetBase):
 
             while (
                 self.cursor.column < len(self.text[self.cursor.line])
-                and self.text[self.cursor.line][self.cursor.column] in ' ();:,./!?'
+                and not self.text[self.cursor.line][self.cursor.column].isalnum()
             ):
                 self.cursor.set(self.cursor.line, self.cursor.column + 1, self.text)
 
             while (
                 self.cursor.column < len(self.text[self.cursor.line])
-                and self.text[self.cursor.line][self.cursor.column] not in ' ();:,./!?'
+                and self.text[self.cursor.line][self.cursor.column].isalnum()
             ):
                 self.cursor.set(self.cursor.line, self.cursor.column + 1, self.text)
 
@@ -645,6 +666,7 @@ class TextBox(WidgetBase):
     def escape(self) -> None:
         self.selected = False
         self.showCursor = False
+        self.resetHighlight()
         pygame.key.set_repeat(*self.originalRepeat)
 
     def setText(self, text: str) -> None:
