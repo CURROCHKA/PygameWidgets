@@ -120,6 +120,8 @@ class TextBox(WidgetBase):
         self._actualY = self._y + self.textOffsetTop + self.borderThickness
         self._minHeight = minHeight
         self._maxHeight = maxHeight
+        self.firstVisibleLineIndex = 0
+        self.maxVisibleLines = self._actualHeight // self.fontSize
 
     def listen(self, events) -> None:
         '''Wait for inputs
@@ -451,6 +453,9 @@ class TextBox(WidgetBase):
             return
         if self.selected:
             self.updateCursor()
+        
+        self._ensureCursorVisible()
+
         self._drawBorder()
         self._drawBackground()
         self._drawSelection()
@@ -468,15 +473,10 @@ class TextBox(WidgetBase):
             colour = self.textColour
 
         for i, visualLine in enumerate(displayLines):
-            lineY = self._actualY + i * self.fontSize
-            lineBottom = lineY + self.fontSize
+            if not (self.firstVisibleLineIndex <= i < self.firstVisibleLineIndex + self.maxVisibleLines):
+                continue
 
-            if lineBottom > self._actualY + self._actualHeight:
-                if lineBottom < self._maxHeight:
-                    self._height += self.fontSize
-                    self._actualHeight += self.fontSize
-                else:
-                    pass  # TODO: text move up
+            lineY = self._actualY + (i - self.firstVisibleLineIndex) * self.fontSize
 
             textSurface = self.font.render(visualLine['text'], True, colour)
             self.win.blit(textSurface, (self._actualX, lineY))
@@ -484,6 +484,9 @@ class TextBox(WidgetBase):
     def _drawCursor(self) -> None:
         if self.selected and self.showCursor:
             visualLineIndex = self.getCurrentVisualLineIndex()
+
+            if not (self.firstVisibleLineIndex <= visualLineIndex < self.firstVisibleLineIndex + self.maxVisibleLines):
+                return
 
             if visualLineIndex != -1:
                 visualLine = self.cachedVisualLines[visualLineIndex]
@@ -494,7 +497,7 @@ class TextBox(WidgetBase):
                 startX = self._actualX + self.font.size(text)[0]
                 endX = startX
 
-                startY = self._actualY + self.fontSize * visualLineIndex
+                startY = self._actualY + self.fontSize * (visualLineIndex - self.firstVisibleLineIndex)
                 endY = startY + self.fontSize
 
                 pygame.draw.line(
@@ -529,12 +532,15 @@ class TextBox(WidgetBase):
         start, end = self.getNormalizedSelection()
 
         for i, visualLine in enumerate(self.cachedVisualLines):
+            if not (self.firstVisibleLineIndex <= i < self.firstVisibleLineIndex + self.maxVisibleLines):
+                continue
+
             lineIndex = visualLine['lineIndex']
 
             if not (start.line <= lineIndex <= end.line):
                 continue
 
-            lineY = self._actualY + self.fontSize * i
+            lineY = self._actualY + self.fontSize * (i - self.firstVisibleLineIndex)
 
             lineStart = visualLine['startAt']
 
@@ -577,6 +583,35 @@ class TextBox(WidgetBase):
                 self.selectionColour,
                 (self._actualX + textBeforeWidth, lineY, textWidth, self.fontSize),
             )
+
+    def _ensureCursorVisible(self) -> None:
+        visualLineIndex = self.getCurrentVisualLineIndex()
+        if visualLineIndex == -1:
+            return
+
+        if visualLineIndex < self.firstVisibleLineIndex:
+            self.firstVisibleLineIndex = visualLineIndex
+        
+        elif visualLineIndex >= self.firstVisibleLineIndex + self.maxVisibleLines:
+            self.firstVisibleLineIndex = visualLineIndex - self.maxVisibleLines + 1
+            
+        maxScroll = max(0, len(self.cachedVisualLines) - self.maxVisibleLines)
+        self.firstVisibleLineIndex = max(0, min(self.firstVisibleLineIndex, maxScroll))
+
+    def _updateLayout(self) -> None:
+        neededHeight = len(self.cachedVisualLines) * self.fontSize + self.textOffsetTop + self.borderThickness * 2
+        
+        self._height = max(self._minHeight, min(neededHeight, self._maxHeight))
+        
+        self._actualHeight = (
+            self._height
+            - self.textOffsetTop
+            - self.borderThickness * 2
+        )
+        
+        self.maxVisibleLines = self._actualHeight // self.fontSize
+        if self.maxVisibleLines == 0:
+            self.maxVisibleLines = 1
 
     def addText(self, text: str) -> None:
         if not self.isEmptySelection():
@@ -699,6 +734,8 @@ class TextBox(WidgetBase):
                     )
                     start = end
 
+        self._updateLayout()
+
     def resetSelection(self) -> None:
         self.selectionStart.set(self.cursor.line, self.cursor.column, self.text)
         self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
@@ -799,7 +836,10 @@ class TextBox(WidgetBase):
 
     def _setColumnFromMouse(self, mouseX: int, mouseY: int) -> None:
         for i, visualLine in enumerate(self.cachedVisualLines):
-            lineY = self._actualY + self.fontSize * i
+            if not (self.firstVisibleLineIndex <= i < self.firstVisibleLineIndex + self.maxVisibleLines):
+                continue
+
+            lineY = self._actualY + self.fontSize * (i - self.firstVisibleLineIndex)
 
             if lineY < mouseY < lineY + self.fontSize:
                 if visualLine['lineIndex'] != self.cursor.line:
@@ -907,7 +947,7 @@ if __name__ == '__main__':
         100,
         800,
         100,
-        400,
+        450,
         fontSize=50,
         borderColour=(255, 0, 0),
         textColour=(0, 200, 0),
