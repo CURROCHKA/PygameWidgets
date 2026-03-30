@@ -389,42 +389,43 @@ class TextBox(WidgetBase):
         if self.isEmptyHighlight():
             self.resetHighlight()
 
-        visualLineIndex = self.getCurrentVisualLineIndex()
+        if event.mod & pygame.KMOD_CTRL:
+            self.cursor.set(0, 0, self.text)
+            
+            if event.mod & pygame.KMOD_SHIFT:
+                self.highlightEnd.set(self.cursor.line, self.cursor.column, self.text)
 
-        if visualLineIndex != -1:
-            visualLine = self.cachedVisualLines[visualLineIndex]
-            self.cursor.set(self.cursor.line, visualLine['startAt'], self.text)
-            self._setPreferredColumn()
-
-        if event.mod & pygame.KMOD_SHIFT:
-            self.highlightEnd.set(self.cursor.line, self.cursor.column, self.text)
-            if event.mod & pygame.KMOD_CTRL:
-                self.cursor.set(0, 0, self.text)
-                self.highlightEnd.set(0, 0, self.text)
         else:
+            visualLineIndex = self.getCurrentVisualLineIndex()
+
+            if visualLineIndex != -1:
+                visualLine = self.cachedVisualLines[visualLineIndex]
+                self.cursor.set(self.cursor.line, visualLine['startAt'], self.text)
+                self._setPreferredColumn()
+
             self.resetHighlight()
 
     def _handleEnd(self, event: pygame.Event) -> None:
         if self.isEmptyHighlight():
             self.resetHighlight()
 
-        visualLineIndex = self.getCurrentVisualLineIndex()
-
-        if visualLineIndex != -1:
-            visualLine = self.cachedVisualLines[visualLineIndex]
-            self.cursor.set(
-                self.cursor.line,
-                visualLine['startAt'] + len(visualLine['text']),
-                self.text,
-            )
-            self._setPreferredColumn()
-
-        if event.mod & pygame.KMOD_SHIFT:
-            self.highlightEnd.set(self.cursor.line, self.cursor.column, self.text)
-            if event.mod & pygame.KMOD_CTRL:
-                self.cursor.set(len(self.text) - 1, len(self.text[-1]), self.text)
-                self.highlightEnd.set(len(self.text) - 1, len(self.text[-1]), self.text)
+        if event.mod & pygame.KMOD_CTRL:
+            self.cursor.set(len(self.text) - 1, len(self.text[-1]), self.text)
+            
+            if event.mod & pygame.KMOD_SHIFT:
+                self.highlightEnd.set(self.cursor.line, self.cursor.column, self.text)
         else:
+            visualLineIndex = self.getCurrentVisualLineIndex()
+
+            if visualLineIndex != -1:
+                visualLine = self.cachedVisualLines[visualLineIndex]
+                self.cursor.set(
+                    self.cursor.line,
+                    visualLine['startAt'] + len(visualLine['text']),
+                    self.text,
+                )
+                self._setPreferredColumn()
+
             self.resetHighlight()
 
     def draw(self) -> None:
