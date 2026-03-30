@@ -30,7 +30,17 @@ class TextBox(WidgetBase):
     REPEAT_INTERVAL = 70
     CURSOR_INTERVAL = 400
 
-    def __init__(self, win, x, y, width, height, isSubWidget=False, **kwargs) -> None:
+    def __init__(
+            self,
+            win: pygame.Surface,
+            x: int,
+            y: int, 
+            width: int,
+            minHeight: int,
+            maxHeight: int,
+            isSubWidget=False,
+            **kwargs
+            ) -> None:
         '''A customisable textbox for Pygame
 
         :param win: Surface on which to draw
@@ -45,7 +55,7 @@ class TextBox(WidgetBase):
         :type height: int
         :param kwargs: Optional parameters
         '''
-        super().__init__(win, x, y, width, height, isSubWidget)
+        super().__init__(win, x, y, width, minHeight, isSubWidget)
 
         # Widget state
         self.selected = False
@@ -101,8 +111,15 @@ class TextBox(WidgetBase):
             - self.textOffsetLeft
             - self.borderThickness * 2
         )
+        self._actualHeight = (
+            self._height
+            - self.textOffsetTop
+            - self.borderThickness * 2
+        )
         self._actualX = self._x + self.textOffsetLeft + self.borderThickness
         self._actualY = self._y + self.textOffsetTop + self.borderThickness
+        self._minHeight = minHeight
+        self._maxHeight = maxHeight
 
     def listen(self, events) -> None:
         '''Wait for inputs
@@ -453,6 +470,13 @@ class TextBox(WidgetBase):
         for i, visualLine in enumerate(displayLines):
             lineY = self._actualY + i * self.fontSize
 
+            if lineY + self.fontSize > self._actualY + self._actualHeight:
+                if lineY + self.fontSize < self._maxHeight:
+                    self._height += self.fontSize
+                    self._actualHeight += self.fontSize
+                else:
+                    pass  # TODO: text move up
+
             textSurface = self.font.render(visualLine['text'], True, colour)
             self.win.blit(textSurface, (self._actualX, lineY))
 
@@ -537,10 +561,12 @@ class TextBox(WidgetBase):
                 continue
 
             textBefore = visualLine['text'][:localStart]
-            textHighlight = visualLine['text'][localStart:localEnd]
-
             textBeforeWidth = self.font.size(textBefore)[0]
-            textWidth = self.font.size(textHighlight)[0]
+
+            textUpToEnd = visualLine['text'][:localEnd]
+            textUpToEndWidth = self.font.size(textUpToEnd)[0]
+
+            textWidth = textUpToEndWidth - textBeforeWidth
 
             if isEmptyLine or isEndOfLogicalLine:
                 textWidth += self.font.size(' ')[0]
@@ -652,7 +678,7 @@ class TextBox(WidgetBase):
                     )
                     start = end
 
-                elif lastSpace >= start:
+                elif lastSpace >= start and line[start:lastSpace].strip() != '':
                     self.cachedVisualLines.append(
                         {
                             'text': line[start : lastSpace + 1],
@@ -879,6 +905,7 @@ if __name__ == '__main__':
         100,
         100,
         800,
+        100,
         400,
         fontSize=50,
         borderColour=(255, 0, 0),
