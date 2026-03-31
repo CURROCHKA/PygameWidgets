@@ -160,6 +160,11 @@ class TextBox(WidgetBase):
         # Keyboard Input
         if self.selected:
             for event in events:
+                if event.type == pygame.MOUSEWHEEL and self.contains(x, y):
+                    self.firstVisibleLineIndex -= event.y  # * speedOfScroll
+                    maxScroll = max(0, len(self.cachedVisualLines) - self.maxVisibleLines)
+                    self.firstVisibleLineIndex = max(0, min(self.firstVisibleLineIndex, maxScroll))
+
                 if event.type == pygame.KEYDOWN:
                     self.showCursor = True
                     self.cursorTime = pygame.time.get_ticks()
@@ -280,6 +285,8 @@ class TextBox(WidgetBase):
             self._setPreferredColumn()
             self.onTextChanged(*self.onTextChangedParams)
 
+        self._ensureCursorVisible()
+
     def _handleDelete(self, event: pygame.Event) -> None:
         if not self.isEmptySelection():
             self.eraseSelectedText()
@@ -311,6 +318,8 @@ class TextBox(WidgetBase):
             self._setPreferredColumn()
             self.onTextChanged(*self.onTextChangedParams)
 
+        self._ensureCursorVisible()
+
     def _handleUp(self) -> None:
         self.resetSelection()
 
@@ -334,6 +343,8 @@ class TextBox(WidgetBase):
             else:
                 self.cursor.set(self.cursor.line, 0, self.text)
                 self._setPreferredColumn()
+        
+        self._ensureCursorVisible()
 
     def _handleDown(self) -> None:
         self.resetSelection()
@@ -361,6 +372,8 @@ class TextBox(WidgetBase):
                     lines=self.text,
                 )
                 self._setPreferredColumn()
+        
+        self._ensureCursorVisible()
 
     def _handleLeft(self, event: pygame.Event) -> None:
         if self.isEmptySelection():
@@ -382,6 +395,7 @@ class TextBox(WidgetBase):
             self.resetSelection()
 
         self._setPreferredColumn()
+        self._ensureCursorVisible()
 
     def _handleRight(self, event: pygame.Event) -> None:
         if self.isEmptySelection():
@@ -403,6 +417,7 @@ class TextBox(WidgetBase):
             self.resetSelection()
 
         self._setPreferredColumn()
+        self._ensureCursorVisible()
 
     def _handleHome(self, event: pygame.Event) -> None:
         if self.isEmptySelection():
@@ -423,6 +438,8 @@ class TextBox(WidgetBase):
                 self._setPreferredColumn()
 
             self.resetSelection()
+        
+        self._ensureCursorVisible()
 
     def _handleEnd(self, event: pygame.Event) -> None:
         if self.isEmptySelection():
@@ -447,15 +464,14 @@ class TextBox(WidgetBase):
 
             self.resetSelection()
 
+        self._ensureCursorVisible()
+
     def draw(self) -> None:
         '''Display to surface'''
         if self._hidden:
             return
         if self.selected:
             self.updateCursor()
-        
-        self._ensureCursorVisible()
-
         self._drawBorder()
         self._drawBackground()
         self._drawSelection()
@@ -637,6 +653,7 @@ class TextBox(WidgetBase):
 
         self._setVisualLines()
         self._setPreferredColumn()
+        self._ensureCursorVisible()
         self.onTextChanged(*self.onTextChangedParams)
 
     def eraseSelectedText(self) -> None:
