@@ -29,6 +29,7 @@ class TextBox(WidgetBase):
     REPEAT_DELAY = 400
     REPEAT_INTERVAL = 70
     CURSOR_INTERVAL = 400
+    DOUBLE_CLICK_INTERVAL = 300
 
     def __init__(
             self,
@@ -68,6 +69,9 @@ class TextBox(WidgetBase):
         self.cursorColour = kwargs.get('cursorColour', (0, 0, 0))
         self.showCursor = not self.readOnly
         self.cursorTime = 0
+
+        self.lastClickTime = 0
+        self.isDoubleClick = False
 
         # Text state
         self.text = ['']
@@ -138,21 +142,31 @@ class TextBox(WidgetBase):
 
         if mouseState == MouseState.CLICK:
             if self.contains(x, y):
+                now = pygame.time.get_ticks()
+
+                self.isDoubleClick = (now - self.lastClickTime) < self.DOUBLE_CLICK_INTERVAL
+                self.lastClickTime = now
+
                 self.selected = True
                 self.showCursor = True
-                self.cursorTime = pygame.time.get_ticks()
+                self.cursorTime = now
 
                 self._setColumnFromMouse(x, y)
-                self.resetSelection()
+                if self.isDoubleClick:
+                    self._moveCursorWordLeft()
+                    self.selectionStart.set(self.cursor.line, self.cursor.column, self.text)
+                    self._moveCursorWordRight()
+                    self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
+                else:
+                    self.resetSelection()
                 self._setPreferredColumn()
 
                 pygame.key.set_repeat(self.REPEAT_DELAY, self.REPEAT_INTERVAL)
             else:
                 self.escape()
 
-        elif mouseState == MouseState.DRAG and self.contains(x, y):
+        elif mouseState == MouseState.DRAG and self.selected and not self.isDoubleClick:
             self.cursorTime = pygame.time.get_ticks()
-
             self._setColumnFromMouse(x, y)
             self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
             self._setPreferredColumn()
@@ -428,6 +442,8 @@ class TextBox(WidgetBase):
             
             if event.mod & pygame.KMOD_SHIFT:
                 self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
+            else:
+                self.resetSelection()
 
         else:
             visualLineIndex = self.getCurrentVisualLineIndex()
@@ -450,6 +466,9 @@ class TextBox(WidgetBase):
             
             if event.mod & pygame.KMOD_SHIFT:
                 self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
+            else:
+                self.resetSelection()
+
         else:
             visualLineIndex = self.getCurrentVisualLineIndex()
 
@@ -633,8 +652,7 @@ class TextBox(WidgetBase):
         if not self.isEmptySelection():
             self.eraseSelectedText()
 
-        text = text.replace('\t', ' ' * self.tabSpaces)
-        text = text.replace('\r', '')
+        text = text.replace('\t', ' ' * self.tabSpaces).replace('\r', '')
         lines = text.split('\n')
 
         rightPart = self.text[self.cursor.line][self.cursor.column :]
@@ -852,6 +870,13 @@ class TextBox(WidgetBase):
             self.cursor.set(self.cursor.line, self.cursor.column + 1, self.text)
 
     def _setColumnFromMouse(self, mouseX: int, mouseY: int) -> None:
+        if not self.cachedVisualLines:
+            return
+
+        minVisibleY = self._actualY + self.fontSize // 2
+        maxVisibleY = self._actualY + self._actualHeight - self.fontSize // 2
+        mouseY = max(minVisibleY, min(mouseY, maxVisibleY))
+
         for i, visualLine in enumerate(self.cachedVisualLines):
             if not (self.firstVisibleLineIndex <= i < self.firstVisibleLineIndex + self.maxVisibleLines):
                 continue
