@@ -5,6 +5,7 @@ import pygame_widgets
 from pygame_widgets.widget import WidgetBase
 from pygame_widgets.mouse import Mouse, MouseState
 
+from bisect import bisect_right
 from dataclasses import dataclass
 
 
@@ -88,6 +89,7 @@ class TextBox(WidgetBase):
         self.cachedVisualLines = [
             {'text': '', 'lineIndex': 0, 'startAt': 0, 'prefixWidths': [0]}
         ]
+        self.visualLineRanges = {0: (0, 1)}
         self.tabSpaces = kwargs.get('tabSpaces', 4)
 
         # Font style
@@ -141,6 +143,8 @@ class TextBox(WidgetBase):
         )
         self.firstVisibleLineIndex = 0
         self.maxVisibleLines = max(1, self._actualHeight // self.lineHeight)
+        self._widthCache = {}
+        self._renderedTextCache = {}
 
     def listen(self, events) -> None:
         '''Wait for inputs
@@ -318,13 +322,14 @@ class TextBox(WidgetBase):
             self.eraseSelectedText()
 
         elif self.cursor.column > 0:
+            reflowStartColumn = self.cursor.column - 1
             self.text[self.cursor.line] = (
                 self.text[self.cursor.line][: self.cursor.column - 1]
                 + self.text[self.cursor.line][self.cursor.column :]
             )
             self.cursor.set(self.cursor.line, self.cursor.column - 1, self.text)
 
-            self._setVisualLines()
+            self._setVisualLines(self.cursor.line, reflowStartColumn)
             self._setPreferredColumn()
             self.onTextChanged(*self.onTextChangedParams)
 
@@ -334,7 +339,7 @@ class TextBox(WidgetBase):
             self.text.pop(self.cursor.line)
             self.cursor.set(self.cursor.line - 1, previousLineLength, self.text)
 
-            self._setVisualLines()
+            self._setVisualLines(self.cursor.line, previousLineLength)
             self._setPreferredColumn()
             self.onTextChanged(*self.onTextChangedParams)
 
@@ -356,21 +361,23 @@ class TextBox(WidgetBase):
             self.eraseSelectedText()
 
         elif self.cursor.column < len(self.text[self.cursor.line]):
+            reflowStartColumn = self.cursor.column
 
             self.text[self.cursor.line] = (
                 self.text[self.cursor.line][: self.cursor.column]
                 + self.text[self.cursor.line][self.cursor.column + 1 :]
             )
 
-            self._setVisualLines()
+            self._setVisualLines(self.cursor.line, reflowStartColumn)
             self._setPreferredColumn()
             self.onTextChanged(*self.onTextChangedParams)
 
         elif self.cursor.line < len(self.text) - 1:
+            reflowStartColumn = len(self.text[self.cursor.line])
             self.text[self.cursor.line] += self.text[self.cursor.line + 1]
             self.text.pop(self.cursor.line + 1)
 
-            self._setVisualLines()
+            self._setVisualLines(self.cursor.line, reflowStartColumn)
             self._setPreferredColumn()
             self.onTextChanged(*self.onTextChangedParams)
 
@@ -557,7 +564,7 @@ class TextBox(WidgetBase):
 
             lineY = self._actualY + (i - self.firstVisibleLineIndex) * self.lineHeight
 
-            textSurface = self.font.render(visualLine['text'], True, colour)
+            textSurface = self._getRenderedTextSurface(visualLine['text'], colour)
             self.win.blit(textSurface, (self._actualX, lineY))
 
     def _drawCursor(self) -> None:
@@ -662,7 +669,7 @@ class TextBox(WidgetBase):
             textWidth = textUpToEndWidth - textBeforeWidth
 
             if isEmptyLine or isEndOfLogicalLine:
-                textWidth += self.font.size(' ')[0]
+                textWidth += self._getTextWidth(' ')
 
             pygame.draw.rect(
                 self.win,
@@ -733,6 +740,8 @@ class TextBox(WidgetBase):
 
         text = str(text).replace('\t', ' ' * self.tabSpaces).replace('\r', '')
         lines = text.split('\n')
+        reflowStartLine = self.cursor.line
+        reflowStartColumn = self.cursor.column
 
         rightPart = self.text[self.cursor.line][self.cursor.column :]
 
@@ -748,7 +757,7 @@ class TextBox(WidgetBase):
 
         self.text[self.cursor.line] += rightPart
 
-        self._setVisualLines()
+        self._setVisualLines(reflowStartLine, reflowStartColumn)
         self._setPreferredColumn()
         self.resetSelection()
         self._ensureCursorVisible()
@@ -757,6 +766,8 @@ class TextBox(WidgetBase):
 
     def eraseSelectedText(self, callOnTextChanged: bool = True) -> None:
         start, end = self.getNormalizedSelection()
+        reflowStartLine = start.line
+        reflowStartColumn = start.column
 
         if start.line == end.line:
             self.text[start.line] = (
@@ -773,7 +784,7 @@ class TextBox(WidgetBase):
         self.cursor.set(start.line, start.column, self.text)
         self.resetSelection()
 
-        self._setVisualLines()
+        self._setVisualLines(reflowStartLine, reflowStartColumn)
         self._setPreferredColumn()
         if callOnTextChanged:
             self.onTextChanged(*self.onTextChangedParams)
@@ -787,97 +798,140 @@ class TextBox(WidgetBase):
 
         return start, end
 
-    def _setVisualLines(self) -> None:
-        self.cachedVisualLines = []
-        for lineIndex, line in enumerate(self.text):
+    def _setVisualLines(self, startLine: int = 0, startColumn: int = 0) -> None:
+        self._widthCache.clear()
+        self._renderedTextCache.clear()
+        startLine = max(0, min(startLine, len(self.text) - 1))
+        startColumn = max(0, startColumn)
+
+        if (startLine, startColumn) == (0, 0) or not self.cachedVisualLines:
+            self.cachedVisualLines = []
+            self.visualLineRanges = {}
+            lineStartColumn = 0
+        else:
+            oldLineStart = self.visualLineRanges.get(
+                startLine, (len(self.cachedVisualLines), len(self.cachedVisualLines))
+            )[0]
+            firstChangedVisualLine, lineStartColumn = self._getReflowStart(
+                startLine, startColumn
+            )
+            self.cachedVisualLines = self.cachedVisualLines[:firstChangedVisualLine]
+            self.visualLineRanges = {
+                lineIndex: visualRange
+                for lineIndex, visualRange in self.visualLineRanges.items()
+                if lineIndex < startLine
+            }
+            if firstChangedVisualLine > oldLineStart:
+                self.visualLineRanges[startLine] = (oldLineStart, firstChangedVisualLine)
+
+        for lineIndex in range(startLine, len(self.text)):
+            line = self.text[lineIndex]
+
             if line == '':
-                self.cachedVisualLines.append(
-                    {
-                        'text': '',
-                        'lineIndex': lineIndex,
-                        'startAt': 0,
-                        'prefixWidths': [0],
-                    }
-                )
+                self._appendVisualLine('', lineIndex, 0)
                 continue
 
-            start = 0
+            start = lineStartColumn if lineIndex == startLine else 0
             while start < len(line):
-                end = start
-                lastSpace = -1
-
-                while end < len(line):
-                    if line[end] == ' ':
-                        lastSpace = end
-
-                    testSegment = line[start : end + 1]
-                    if self.font.size(testSegment)[0] > self._actualWidth:
-                        break
-                    end += 1
+                end = self._findVisualLineEnd(line, start)
 
                 if end == len(line):
-                    self.cachedVisualLines.append(
-                        {
-                            'text': line[start:end],
-                            'lineIndex': lineIndex,
-                            'startAt': start,
-                            'prefixWidths': self._buildPrefixWidths(
-                                line[start:end]
-                            ),
-                        }
-                    )
+                    self._appendVisualLine(line[start:end], lineIndex, start)
                     break
 
                 if end == start:
                     end = start + 1
-                    self.cachedVisualLines.append(
-                        {
-                            'text': line[start:end],
-                            'lineIndex': lineIndex,
-                            'startAt': start,
-                            'prefixWidths': self._buildPrefixWidths(
-                                line[start:end]
-                            ),
-                        }
-                    )
+                    self._appendVisualLine(line[start:end], lineIndex, start)
                     start = end
-
-                elif lastSpace >= start and line[start:lastSpace].strip() != '':
-                    self.cachedVisualLines.append(
-                        {
-                            'text': line[start : lastSpace + 1],
-                            'lineIndex': lineIndex,
-                            'startAt': start,
-                            'prefixWidths': self._buildPrefixWidths(
-                                line[start : lastSpace + 1]
-                            ),
-                        }
-                    )
-                    start = lastSpace + 1
 
                 else:
-                    self.cachedVisualLines.append(
-                        {
-                            'text': line[start:end],
-                            'lineIndex': lineIndex,
-                            'startAt': start,
-                            'prefixWidths': self._buildPrefixWidths(
-                                line[start:end]
-                            ),
-                        }
-                    )
-                    start = end
+                    lastSpace = line.rfind(' ', start, end + 1)
+
+                    if lastSpace >= start and line[start:lastSpace].strip() != '':
+                        self._appendVisualLine(
+                            line[start : lastSpace + 1], lineIndex, start
+                        )
+                        start = lastSpace + 1
+
+                    else:
+                        self._appendVisualLine(line[start:end], lineIndex, start)
+                        start = end
 
         self._updateLayout()
+        self._widthCache.clear()
+
+    def _getReflowStart(self, lineIndex: int, column: int) -> tuple[int, int]:
+        lineStart, lineEnd = self.visualLineRanges.get(
+            lineIndex, (len(self.cachedVisualLines), len(self.cachedVisualLines))
+        )
+
+        for visualLineIndex in range(lineStart, lineEnd):
+            visualLine = self.cachedVisualLines[visualLineIndex]
+            visualLineEnd = visualLine['startAt'] + len(visualLine['text'])
+
+            if column < visualLineEnd:
+                return visualLineIndex, visualLine['startAt']
+
+            if column == visualLineEnd:
+                nextVisualLineIndex = visualLineIndex + 1
+                if nextVisualLineIndex < lineEnd:
+                    return (
+                        nextVisualLineIndex,
+                        self.cachedVisualLines[nextVisualLineIndex]['startAt'],
+                    )
+                return visualLineIndex, visualLine['startAt']
+
+        if lineEnd > lineStart:
+            lastVisualLine = self.cachedVisualLines[lineEnd - 1]
+            return lineEnd - 1, lastVisualLine['startAt']
+
+        return len(self.cachedVisualLines), 0
+
+    def _appendVisualLine(self, text: str, lineIndex: int, startAt: int) -> None:
+        visualLineIndex = len(self.cachedVisualLines)
+        self.cachedVisualLines.append(
+            {
+                'text': text,
+                'lineIndex': lineIndex,
+                'startAt': startAt,
+                'prefixWidths': self._buildPrefixWidths(text),
+            }
+        )
+
+        if lineIndex in self.visualLineRanges:
+            self.visualLineRanges[lineIndex] = (
+                self.visualLineRanges[lineIndex][0],
+                visualLineIndex + 1,
+            )
+        else:
+            self.visualLineRanges[lineIndex] = (visualLineIndex, visualLineIndex + 1)
+
+    def _findVisualLineEnd(self, line: str, start: int) -> int:
+        return (
+            bisect_right(
+                range(len(line) + 1),
+                self._actualWidth,
+                lo=start + 1,
+                key=lambda end: self._getTextWidth(line[start:end]),
+            )
+            - 1
+        )
 
     def resetSelection(self) -> None:
         self.selectionStart.set(self.cursor.line, self.cursor.column, self.text)
         self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
 
     def getCurrentVisualLineIndex(self) -> int:
-        for lineIndex, visualLine in enumerate(self.cachedVisualLines):
+        startIndex, endIndex = self.visualLineRanges.get(
+            self.cursor.line, (0, len(self.cachedVisualLines))
+        )
+
+        for lineIndex in range(startIndex, endIndex):
+            visualLine = self.cachedVisualLines[lineIndex]
+
             if visualLine['lineIndex'] != self.cursor.line:
                 continue
+
             lineWidth = visualLine['startAt'] + len(visualLine['text'])
             if visualLine['startAt'] <= self.cursor.column <= lineWidth:
                 if (
@@ -890,11 +944,16 @@ class TextBox(WidgetBase):
                 return lineIndex
         return -1
 
+    def _getTextWidth(self, text: str) -> int:
+        if text not in self._widthCache:
+            self._widthCache[text] = self.font.size(text)[0]
+        return self._widthCache[text]
+
     def _buildPrefixWidths(self, text: str) -> list[int]:
         widths = [0]
 
         for column in range(1, len(text) + 1):
-            widths.append(self.font.size(text[:column])[0])
+            widths.append(self._getTextWidth(text[:column]))
 
         return widths
 
@@ -902,6 +961,25 @@ class TextBox(WidgetBase):
         prefixWidths = visualLine['prefixWidths']
         column = max(0, min(column, len(prefixWidths) - 1))
         return prefixWidths[column]
+
+    def _getRenderedTextSurface(
+            self,
+            text: str,
+            colour
+            ) -> pygame.Surface:
+        cacheKey = (id(self.font), text, self._getColourCacheKey(colour))
+
+        if cacheKey not in self._renderedTextCache:
+            self._renderedTextCache[cacheKey] = self.font.render(text, True, colour)
+
+        return self._renderedTextCache[cacheKey]
+
+    @staticmethod
+    def _getColourCacheKey(colour):
+        try:
+            return tuple(colour)
+        except TypeError:
+            return colour
 
     def updateCursor(self) -> None:
         now = pygame.time.get_ticks()
