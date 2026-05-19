@@ -415,7 +415,10 @@ class TextBox(WidgetBase):
         visualLineIndex = self.getCurrentVisualLineIndex()
 
         if visualLineIndex != -1:
-            if visualLineIndex < len(self.cachedVisualLines) - 1:
+            line = self.cachedVisualLines[visualLineIndex]
+            if line['startAt'] + len(line['text']) == self.cursor.column != 0:
+                visualLineIndex = min(visualLineIndex + 1, len(self.cachedVisualLines) - 1)
+            if visualLineIndex + 1 < len(self.cachedVisualLines):
                 nextLine = self.cachedVisualLines[visualLineIndex + 1]
 
                 desiredColumn = min(
@@ -449,6 +452,8 @@ class TextBox(WidgetBase):
             self.cursor.set(
                 self.cursor.line - 1, len(self.text[self.cursor.line - 1]), self.text
             )
+        elif not self.isEmptySelection():
+            self.cursor.set(self.selectionStart.line, self.selectionStart.column, self.text)
         else:
             self.cursor.set(self.cursor.line, max(self.cursor.column - 1, 0), self.text)
 
@@ -471,6 +476,8 @@ class TextBox(WidgetBase):
             self.text[self.cursor.line]
         ) and self.cursor.line + 1 < len(self.text):
             self.cursor.set(self.cursor.line + 1, 0, self.text)
+        elif not self.isEmptySelection():
+            self.cursor.set(self.selectionEnd.line, self.selectionEnd.column, self.text)
         else:
             self.cursor.set(self.cursor.line, self.cursor.column + 1, self.text)
 
@@ -934,13 +941,13 @@ class TextBox(WidgetBase):
 
             lineWidth = visualLine['startAt'] + len(visualLine['text'])
             if visualLine['startAt'] <= self.cursor.column <= lineWidth:
-                if (
-                    self.cursor.column == lineWidth != 0
-                    and lineIndex + 1 < len(self.cachedVisualLines)
-                    and self.cachedVisualLines[lineIndex + 1]['lineIndex']
-                    == self.cursor.line
-                ):
-                    return lineIndex + 1
+                # if (
+                #     self.cursor.column == lineWidth != 0
+                #     and lineIndex + 1 < len(self.cachedVisualLines)
+                #     and self.cachedVisualLines[lineIndex + 1]['lineIndex']
+                #     == self.cursor.line
+                # ):
+                #     return lineIndex + 1
                 return lineIndex
         return -1
 
