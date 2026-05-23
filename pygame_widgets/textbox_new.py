@@ -168,6 +168,7 @@ class TextBox(WidgetBase):
         )
         self.firstVisibleLineIndex = 0
         self.maxVisibleLines = max(1, self._actualHeight // self.lineHeight)
+        self.linesPerScroll = kwargs.get('linesPerScroll', 1)
         self._widthCache = {}
         self._renderedTextCache = {}
 
@@ -221,7 +222,7 @@ class TextBox(WidgetBase):
         if self.selected:
             for event in events:
                 if event.type == pygame.MOUSEWHEEL and self.contains(x, y):
-                    self.firstVisibleLineIndex -= event.y  # * speedOfScroll
+                    self.firstVisibleLineIndex -= event.y * self.linesPerScroll
                     maxScroll = max(0, len(self.cachedVisualLines) - self.maxVisibleLines)
                     self.firstVisibleLineIndex = max(0, min(self.firstVisibleLineIndex, maxScroll))
 
@@ -253,13 +254,13 @@ class TextBox(WidgetBase):
                         pygame.K_UP,
                         pygame.K_KP_8 if not event.mod & pygame.KMOD_NUM else -1,
                     ]:
-                        self._handleUp()
+                        self._handleUp(event)
 
                     elif event.key in [
                         pygame.K_DOWN,
                         pygame.K_KP_2 if not event.mod & pygame.KMOD_NUM else -1,
                     ]:
-                        self._handleDown()
+                        self._handleDown(event)
 
                     elif event.key in [
                         pygame.K_LEFT,
@@ -408,8 +409,9 @@ class TextBox(WidgetBase):
 
         self._ensureCursorVisible()
 
-    def _handleUp(self) -> None:
-        self.resetSelection()
+    def _handleUp(self, event: pygame.Event) -> None:
+        if self.isEmptySelection():
+            self.resetSelection()
 
         visualLineIndex = self.getCurrentVisualLineIndex()
 
@@ -423,19 +425,23 @@ class TextBox(WidgetBase):
                 )
 
                 self.cursor.set(
-                    line=previousLine['lineIndex'],
-                    column=desiredColumn,
-                    lines=self.text,
+                    previousLine['lineIndex'],
+                    desiredColumn,
+                    self.text,
                 )
 
             else:
                 self.cursor.set(self.cursor.line, 0, self.text)
                 self._setPreferredColumn()
 
+            if event.mod & pygame.KMOD_SHIFT:
+                self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)            
+
         self._ensureCursorVisible()
 
-    def _handleDown(self) -> None:
-        self.resetSelection()
+    def _handleDown(self, event: pygame.Event) -> None:
+        if self.isEmptySelection():
+            self.resetSelection()
 
         visualLineIndex = self.getCurrentVisualLineIndex()
 
@@ -449,17 +455,20 @@ class TextBox(WidgetBase):
                 )
 
                 self.cursor.set(
-                    line=nextLine['lineIndex'], column=desiredColumn, lines=self.text
+                    nextLine['lineIndex'], desiredColumn, self.text
                 )
 
             else:
                 visualLine = self.cachedVisualLines[visualLineIndex]
                 self.cursor.set(
-                    line=self.cursor.line,
-                    column=visualLine['startAt'] + len(visualLine['text']),
-                    lines=self.text,
+                    self.cursor.line,
+                    visualLine['startAt'] + len(visualLine['text']),
+                    self.text,
                 )
                 self._setPreferredColumn()
+
+            if event.mod & pygame.KMOD_SHIFT:
+                self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)            
 
         self._ensureCursorVisible()
 
