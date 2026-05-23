@@ -24,6 +24,31 @@ class Cursor:
         self.column = column
         self.clamp(lines)
 
+    def __eq__(self, other):
+        if not isinstance(other, Cursor):
+            return NotImplemented
+        return (self.line, self.column) == (other.line, other.column)
+    
+    def __lt__(self, other):
+        if not isinstance(other, Cursor):
+            return NotImplemented
+        return (self.line, self.column) < (other.line, other.column)
+    
+    def __le__(self, other):
+        if not isinstance(other, Cursor):
+            return NotImplemented
+        return (self.line, self.column) <= (other.line, other.column)
+    
+    def __gt__(self, other):
+        if not isinstance(other, Cursor):
+            return NotImplemented
+        return (self.line, self.column) > (other.line, other.column)
+    
+    def __ge__(self, other):
+        if not isinstance(other, Cursor):
+            return NotImplemented
+        return (self.line, self.column) >= (other.line, other.column)
+
 
 class TextBox(WidgetBase):
     # Times in ms
@@ -415,7 +440,7 @@ class TextBox(WidgetBase):
         visualLineIndex = self.getCurrentVisualLineIndex()
 
         if visualLineIndex != -1:
-            if visualLineIndex < len(self.cachedVisualLines) - 1:
+            if visualLineIndex + 1 < len(self.cachedVisualLines):
                 nextLine = self.cachedVisualLines[visualLineIndex + 1]
 
                 desiredColumn = min(
@@ -449,12 +474,16 @@ class TextBox(WidgetBase):
             self.cursor.set(
                 self.cursor.line - 1, len(self.text[self.cursor.line - 1]), self.text
             )
+
         else:
             self.cursor.set(self.cursor.line, max(self.cursor.column - 1, 0), self.text)
 
         if event.mod & pygame.KMOD_SHIFT:
             self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
-        else:
+
+        elif not self.isEmptySelection():
+            start, _ = self.getNormalizeSelection()
+            self.cursor.set(start.line, start.column, self.text)
             self.resetSelection()
 
         self._setPreferredColumn()
@@ -466,17 +495,21 @@ class TextBox(WidgetBase):
 
         if event.mod & pygame.KMOD_CTRL:
             self._moveCursorWordRight()
-
+            
         elif self.cursor.column == len(
             self.text[self.cursor.line]
         ) and self.cursor.line + 1 < len(self.text):
             self.cursor.set(self.cursor.line + 1, 0, self.text)
+
         else:
             self.cursor.set(self.cursor.line, self.cursor.column + 1, self.text)
 
         if event.mod & pygame.KMOD_SHIFT:
             self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
-        else:
+            
+        elif not self.isEmptySelection():
+            _, end = self.getNormalizeSelection()
+            self.cursor.set(end.line, end.column, self.text)
             self.resetSelection()
 
         self._setPreferredColumn()
@@ -621,7 +654,7 @@ class TextBox(WidgetBase):
         if self.isEmptySelection():
             return
 
-        start, end = self.getNormalizedSelection()
+        start, end = self.getNormalizeSelection()
 
         for i, visualLine in enumerate(self.cachedVisualLines):
             if not (
@@ -765,7 +798,7 @@ class TextBox(WidgetBase):
             self.onTextChanged(*self.onTextChangedParams)
 
     def eraseSelectedText(self, callOnTextChanged: bool = True) -> None:
-        start, end = self.getNormalizedSelection()
+        start, end = self.getNormalizeSelection()
         reflowStartLine = start.line
         reflowStartColumn = start.column
 
@@ -789,14 +822,10 @@ class TextBox(WidgetBase):
         if callOnTextChanged:
             self.onTextChanged(*self.onTextChangedParams)
 
-    def getNormalizedSelection(self) -> tuple[Cursor, Cursor]:
-        start = self.selectionStart
-        end = self.selectionEnd
-
-        if (start.line, start.column) > (end.line, end.column):
-            start, end = end, start
-
-        return start, end
+    def getNormalizeSelection(self) -> tuple[Cursor, Cursor]:
+        if self.selectionStart > self.selectionEnd:
+            return self.selectionEnd, self.selectionStart
+        return self.selectionStart, self.selectionEnd
 
     def _setVisualLines(self, startLine: int = 0, startColumn: int = 0) -> None:
         self._widthCache.clear()
@@ -1112,7 +1141,7 @@ class TextBox(WidgetBase):
         return '\n'.join(self.text)
 
     def getSelectedText(self) -> str:
-        start, end = self.getNormalizedSelection()
+        start, end = self.getNormalizeSelection()
 
         if start.line == end.line:
             return self.text[start.line][start.column : end.column]
