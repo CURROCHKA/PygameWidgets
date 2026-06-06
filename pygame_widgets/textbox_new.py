@@ -105,6 +105,7 @@ class TextBox(WidgetBase):
         self.cursor = Cursor()
         self.cursorWidth = kwargs.get('cursorWidth', 2)
         self.cursorColour = kwargs.get('cursorColour', (0, 0, 0))
+        self.cursorAlpha = kwargs.get('cursorAlpha', 63)
         self.showCursor = not self.readOnly
         self.cursorTime = 0
 
@@ -594,9 +595,10 @@ class TextBox(WidgetBase):
                         textSurface = self._getRenderedTextSurface(' ', self.textColour)
                     else:
                         textSurface = self._getRenderedTextSurface(self.text[self.cursor.line][self.cursor.column], self.textColour)
-                    cursorRectangle = pygame.Surface((textSurface.width, textSurface.height))
-                    cursorRectangle.set_alpha(64)
-                    self.win.blit(cursorRectangle, (startX, startY))
+                    cursorSurface = pygame.Surface((textSurface.width, textSurface.height))
+                    cursorSurface.fill(self.cursorColour)
+                    cursorSurface.set_alpha(self.cursorAlpha)
+                    self.win.blit(cursorSurface, (startX, startY))
 
     def _drawBorder(self) -> None:
         pygame.draw.rect(
