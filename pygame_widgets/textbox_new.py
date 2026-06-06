@@ -41,7 +41,6 @@ class TextBox(WidgetBase):
             y: int,
             width: int,
             minHeight: int,
-            maxHeight=None,
             isSubWidget=False,
             **kwargs
             ) -> None:
@@ -61,10 +60,6 @@ class TextBox(WidgetBase):
         :type maxHeight: int
         :param kwargs: Optional parameters
         '''
-        if isinstance(maxHeight, bool):
-            isSubWidget = maxHeight
-            maxHeight = None
-
         super().__init__(win, x, y, width, minHeight, isSubWidget)
 
         # Widget state
@@ -126,6 +121,14 @@ class TextBox(WidgetBase):
         self.onTextChangedParams = kwargs.get('onTextChangedParams', ())
 
         # Layout
+        self._minHeight = minHeight
+        self._maxHeight = kwargs.get('maxHeight')
+        self.linesPerScroll = kwargs.get('linesPerScroll', 1)
+        if self._maxHeight is None:
+            self._maxHeight = self._minHeight
+        else:
+            self._maxHeight = max(self._minHeight, self._maxHeight)
+
         self._actualWidth = (
             self._width
             - self.textOffsetRight
@@ -140,13 +143,10 @@ class TextBox(WidgetBase):
         self.lineHeight = self.font.get_linesize()
         self._actualX = self._x + self.textOffsetLeft + self.borderThickness
         self._actualY = self._y + self.textOffsetTop + self.borderThickness
-        self._minHeight = minHeight
-        self._maxHeight = (
-            minHeight if maxHeight is None else max(minHeight, maxHeight)
-        )
+
         self.firstVisibleLineIndex = 0
         self.maxVisibleLines = max(1, self._actualHeight // self.lineHeight)
-        self.linesPerScroll = kwargs.get('linesPerScroll', 1)
+
         self._widthCache = {}
         self._renderedTextCache = {}
 
@@ -196,6 +196,12 @@ class TextBox(WidgetBase):
             self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
             self.setPreferredColumn()
 
+            if y < self._actualY:
+                self.firstVisibleLineIndex = max(0, self.firstVisibleLineIndex - 1)
+            elif y > self._actualY + self._actualHeight:
+                maxScroll = max(0, len(self.cachedVisualLines) - self.maxVisibleLines)
+                self.firstVisibleLineIndex = min(maxScroll, self.firstVisibleLineIndex + 1)
+
         # Keyboard Input
         if self.selected:
             for event in events:
@@ -205,93 +211,7 @@ class TextBox(WidgetBase):
                     self.firstVisibleLineIndex = max(0, min(self.firstVisibleLineIndex, maxScroll))
 
                 if event.type == pygame.KEYDOWN:
-                    now = pygame.time.get_ticks()
-                    self.showCursor = True
-                    self.keyDown = True
-                    self.repeatEvent = event
-                    self.repeatTime = now
-                    self.cursorTime = now
-
-                    if event.key == pygame.K_BACKSPACE:
-                        self._handleBackspace(event)
-
-                    elif event.key == pygame.K_DELETE:
-                        self._handleDelete(event)
-
-                    elif event.key == pygame.K_RETURN:
-                        if (
-                            event.mod & pygame.KMOD_SHIFT
-                            or event.mod & pygame.KMOD_CTRL
-                        ):
-                            if not self.readOnly:
-                                self.addText('\n')
-                        else:
-                            self.onSubmit(*self.onSubmitParams)
-
-                    elif event.key in [
-                        pygame.K_UP,
-                        pygame.K_KP_8 if not event.mod & pygame.KMOD_NUM else -1,
-                    ]:
-                        self._handleUp(event)
-
-                    elif event.key in [
-                        pygame.K_DOWN,
-                        pygame.K_KP_2 if not event.mod & pygame.KMOD_NUM else -1,
-                    ]:
-                        self._handleDown(event)
-
-                    elif event.key in [
-                        pygame.K_LEFT,
-                        pygame.K_KP_4 if not event.mod & pygame.KMOD_NUM else -1,
-                    ]:
-                        self._handleLeft(event)
-
-                    elif event.key in [
-                        pygame.K_RIGHT,
-                        pygame.K_KP_6 if not event.mod & pygame.KMOD_NUM else -1,
-                    ]:
-                        self._handleRight(event)
-
-                    elif event.key in [
-                        pygame.K_HOME,
-                        pygame.K_KP_7 if not event.mod & pygame.KMOD_NUM else -1,
-                    ]:
-                        self._handleHome(event)
-
-                    elif event.key in [
-                        pygame.K_END,
-                        pygame.K_KP_1 if not event.mod & pygame.KMOD_NUM else -1,
-                    ]:
-                        self._handleEnd(event)
-
-                    elif event.key == pygame.K_a and event.mod & pygame.KMOD_CTRL:
-                        self.selectionStart.set(0, 0, self.text)
-                        self.selectionEnd.set(
-                            len(self.text) - 1, len(self.text[-1]), self.text
-                        )
-                        self.cursor.set(
-                            len(self.text) - 1, len(self.text[-1]), self.text
-                        )
-
-                    elif event.key == pygame.K_c and event.mod & pygame.KMOD_CTRL:
-                        self.copySelectedText()
-
-                    elif event.key == pygame.K_v and event.mod & pygame.KMOD_CTRL:
-                        if not self.readOnly:
-                            text = pyperclip.paste()
-                            if text:
-                                self.addText(text)
-
-                    elif event.key == pygame.K_x and event.mod & pygame.KMOD_CTRL:
-                        self.copySelectedText()
-                        if not self.readOnly:
-                            self.eraseSelectedText()
-
-                    elif event.key in (pygame.K_INSERT, pygame.K_KP_0):
-                        self.insertOn = not self.insertOn
-
-                    elif event.key == pygame.K_ESCAPE:
-                        self.escape()
+                    self._processKeyDown(event)
 
                 elif event.type == pygame.TEXTINPUT:
                     if not self.readOnly:
@@ -308,6 +228,95 @@ class TextBox(WidgetBase):
                     self.repeatEvent = None
                     self.keyDown = False
                     self.firstRepeat = True
+
+    def _processKeyDown(self, event: pygame.Event):
+        now = pygame.time.get_ticks()
+        self.showCursor = True
+        self.keyDown = True
+        self.repeatEvent = event
+        self.repeatTime = now
+        self.cursorTime = now
+
+        if event.key == pygame.K_BACKSPACE:
+            self._handleBackspace(event)
+
+        elif event.key == pygame.K_DELETE:
+            self._handleDelete(event)
+
+        elif event.key == pygame.K_RETURN:
+            if (
+                event.mod & pygame.KMOD_SHIFT
+                or event.mod & pygame.KMOD_CTRL
+            ):
+                if not self.readOnly:
+                    self.addText('\n')
+            else:
+                self.onSubmit(*self.onSubmitParams)
+
+        elif event.key in [
+            pygame.K_UP,
+            pygame.K_KP_8 if not event.mod & pygame.KMOD_NUM else -1,
+        ]:
+            self._handleUp(event)
+
+        elif event.key in [
+            pygame.K_DOWN,
+            pygame.K_KP_2 if not event.mod & pygame.KMOD_NUM else -1,
+        ]:
+            self._handleDown(event)
+
+        elif event.key in [
+            pygame.K_LEFT,
+            pygame.K_KP_4 if not event.mod & pygame.KMOD_NUM else -1,
+        ]:
+            self._handleLeft(event)
+
+        elif event.key in [
+            pygame.K_RIGHT,
+            pygame.K_KP_6 if not event.mod & pygame.KMOD_NUM else -1,
+        ]:
+            self._handleRight(event)
+
+        elif event.key in [
+            pygame.K_HOME,
+            pygame.K_KP_7 if not event.mod & pygame.KMOD_NUM else -1,
+        ]:
+            self._handleHome(event)
+
+        elif event.key in [
+            pygame.K_END,
+            pygame.K_KP_1 if not event.mod & pygame.KMOD_NUM else -1,
+        ]:
+            self._handleEnd(event)
+
+        elif event.key == pygame.K_a and event.mod & pygame.KMOD_CTRL:
+            self.selectionStart.set(0, 0, self.text)
+            self.selectionEnd.set(
+                len(self.text) - 1, len(self.text[-1]), self.text
+            )
+            self.cursor.set(
+                len(self.text) - 1, len(self.text[-1]), self.text
+            )
+
+        elif event.key == pygame.K_c and event.mod & pygame.KMOD_CTRL:
+            self.copySelectedText()
+
+        elif event.key == pygame.K_v and event.mod & pygame.KMOD_CTRL:
+            if not self.readOnly:
+                text = pyperclip.paste()
+                if text:
+                    self.addText(text)
+
+        elif event.key == pygame.K_x and event.mod & pygame.KMOD_CTRL:
+            self.copySelectedText()
+            if not self.readOnly:
+                self.eraseSelectedText()
+
+        elif event.key in (pygame.K_INSERT, pygame.K_KP_0):
+            self.insertOn = not self.insertOn
+
+        elif event.key == pygame.K_ESCAPE:
+            self.escape()
 
     def _handleBackspace(self, event: pygame.Event) -> None:
         if self.readOnly:
@@ -699,21 +708,11 @@ class TextBox(WidgetBase):
             if now - self.repeatTime >= self.REPEAT_DELAY:
                 self.firstRepeat = False
                 self.repeatTime = now
-                pygame.event.post(
-                    pygame.event.Event(
-                        self.repeatEvent.type,
-                        self.repeatEvent.__dict__,
-                    )
-                )
+                self._processKeyDown(self.repeatEvent)
 
         elif now - self.repeatTime >= self.REPEAT_INTERVAL:
             self.repeatTime = now
-            pygame.event.post(
-                pygame.event.Event(
-                    self.repeatEvent.type,
-                    self.repeatEvent.__dict__,
-                )
-            )
+            self._processKeyDown(self.repeatEvent)
 
     def _ensureCursorVisible(self) -> None:
         visualLineIndex = self.getVisualLineIndex(self.cursor)
@@ -826,7 +825,6 @@ class TextBox(WidgetBase):
         return self.selectionStart, self.selectionEnd
 
     def _setVisualLines(self, startLine: int = 0, startColumn: int = 0) -> None:
-        self._renderedTextCache.clear()
         startLine = max(0, min(startLine, len(self.text) - 1))
         startColumn = max(0, startColumn)
 
@@ -987,14 +985,13 @@ class TextBox(WidgetBase):
         column = max(0, min(column, len(prefixWidths) - 1))
         return prefixWidths[column]
 
-    def _getRenderedTextSurface(
-            self,
-            text: str,
-            colour
-            ) -> pygame.Surface:
+    def _getRenderedTextSurface(self, text: str, colour) -> pygame.Surface:
         cacheKey = (id(self.font), text, self._getColourCacheKey(colour))
 
         if cacheKey not in self._renderedTextCache:
+            if len(self._renderedTextCache) > 500:
+                self._renderedTextCache.clear()
+                
             self._renderedTextCache[cacheKey] = self.font.render(text, True, colour)
 
         return self._renderedTextCache[cacheKey]
@@ -1171,7 +1168,7 @@ if __name__ == '__main__':
         100,
         800,
         100,
-        450,
+        maxHeight=450,
         fontSize=50,
         borderColour=(255, 0, 0),
         textColour=(0, 200, 0),
