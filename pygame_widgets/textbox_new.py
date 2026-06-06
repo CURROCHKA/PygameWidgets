@@ -309,8 +309,8 @@ class TextBox(WidgetBase):
                         if not self.readOnly:
                             self.eraseSelectedText()
 
-                    elif event.key == pygame.K_INSERT:
-                        self.insertOn = not self.insertOn  # TODO: add insert logic
+                    elif event.key in (pygame.K_INSERT, pygame.K_KP_0):
+                        self.insertOn = not self.insertOn
 
                     elif event.key == pygame.K_ESCAPE:
                         self.escape()
@@ -634,13 +634,22 @@ class TextBox(WidgetBase):
                 )
                 endY = startY + self.lineHeight
 
-                pygame.draw.line(
-                    self.win,
-                    self.cursorColour,
-                    (startX, startY),
-                    (endX, endY),
-                    self.cursorWidth,
-                )
+                if not self.insertOn:
+                    pygame.draw.line(
+                        self.win,
+                        self.cursorColour,
+                        (startX, startY),
+                        (endX, endY),
+                        self.cursorWidth,
+                    )
+                else:
+                    if self.cursor.column == len(self.text[self.cursor.line]):
+                        textSurface = self._getRenderedTextSurface(' ', self.textColour)
+                    else:
+                        textSurface = self._getRenderedTextSurface(self.text[self.cursor.line][self.cursor.column], self.textColour)
+                    cursorRectangle = pygame.Surface((textSurface.width, textSurface.height))
+                    cursorRectangle.set_alpha(64)
+                    self.win.blit(cursorRectangle, (startX, startY))
 
     def _drawBorder(self) -> None:
         pygame.draw.rect(
@@ -785,19 +794,38 @@ class TextBox(WidgetBase):
         reflowStartLine = self.cursor.line
         reflowStartColumn = self.cursor.column
 
-        rightPart = self.text[self.cursor.line][self.cursor.column :]
+        if not self.insertOn:
+            rightPart = self.text[self.cursor.line][self.cursor.column :]
 
-        for i, line in enumerate(lines):
-            self.text[self.cursor.line] = (
-                self.text[self.cursor.line][: self.cursor.column] + line
-            )
-            self.cursor.set(self.cursor.line, self.cursor.column + len(line), self.text)
+            for i, line in enumerate(lines):
+                self.text[self.cursor.line] = (
+                    self.text[self.cursor.line][: self.cursor.column] + line
+                )
+                self.cursor.set(self.cursor.line, self.cursor.column + len(line), self.text)
 
-            if i != len(lines) - 1:
-                self.text.insert(self.cursor.line + 1, '')
-                self.cursor.set(self.cursor.line + 1, 0, self.text)
+                if i != len(lines) - 1:
+                    self.text.insert(self.cursor.line + 1, '')
+                    self.cursor.set(self.cursor.line + 1, 0, self.text)
 
-        self.text[self.cursor.line] += rightPart
+            self.text[self.cursor.line] += rightPart
+
+        else:
+            for i, line in enumerate(lines):
+                if len(line) > len(self.text[self.cursor.line]):
+                    rightPart = ''
+                else:
+                    rightPart = self.text[self.cursor.line][self.cursor.column + len(line) :]
+
+                self.text[self.cursor.line] = (
+                    self.text[self.cursor.line][: self.cursor.column] + line                    
+                )
+                self.cursor.set(self.cursor.line, self.cursor.column + len(line), self.text)
+
+                if i != len(lines) - 1:
+                    self.text.insert(self.cursor.line + 1, '')
+                    self.cursor.set(self.cursor.line + 1, 0, self.text) 
+            
+                self.text[self.cursor.line] += rightPart
 
         self._setVisualLines(reflowStartLine, reflowStartColumn)
         self._setPreferredColumn()
