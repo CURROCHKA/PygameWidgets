@@ -6,16 +6,16 @@ from pygame_widgets.widget import WidgetBase
 from pygame_widgets.mouse import Mouse, MouseState
 
 from bisect import bisect_right
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from typing import Literal
 
 
-@dataclass
+@dataclass(order=True)
 class Cursor:
     line: int = 0
     column: int = 0
-    preferredColumn: int = 0
+    preferredColumn: int = field(default=0, compare=False)
 
     def clamp(self, lines: list[str]) -> None:
         self.line = max(0, min(self.line, len(lines) - 1))
@@ -25,31 +25,6 @@ class Cursor:
         self.line = line
         self.column = column
         self.clamp(lines)
-
-    def __eq__(self, other):
-        if not isinstance(other, Cursor):
-            return NotImplemented
-        return (self.line, self.column) == (other.line, other.column)
-    
-    def __lt__(self, other):
-        if not isinstance(other, Cursor):
-            return NotImplemented
-        return (self.line, self.column) < (other.line, other.column)
-    
-    def __le__(self, other):
-        if not isinstance(other, Cursor):
-            return NotImplemented
-        return (self.line, self.column) <= (other.line, other.column)
-    
-    def __gt__(self, other):
-        if not isinstance(other, Cursor):
-            return NotImplemented
-        return (self.line, self.column) > (other.line, other.column)
-    
-    def __ge__(self, other):
-        if not isinstance(other, Cursor):
-            return NotImplemented
-        return (self.line, self.column) >= (other.line, other.column)
 
 
 class TextBox(WidgetBase):
@@ -86,7 +61,7 @@ class TextBox(WidgetBase):
         :type maxHeight: int
         :param kwargs: Optional parameters
         '''
-        if type(maxHeight) is bool:
+        if isinstance(maxHeight, bool):
             isSubWidget = maxHeight
             maxHeight = None
 
@@ -681,10 +656,11 @@ class TextBox(WidgetBase):
         if extendSelection and self.isEmptySelection():
             self.selectionStart.set(self.cursor.line, self.cursor.column, self.text)
 
-        baseCursor = self.cursor
+        baseCursor = Cursor(self.cursor.line, self.cursor.column)
         if not extendSelection and not self.isEmptySelection():
             start, end = self.getNormalizeSelection()
             baseCursor = start if direction == -1 else end
+            self.cursor.set(baseCursor.line, baseCursor.column, self.text)
             self.resetSelection()
 
         visualLineIndex = self.getVisualLineIndex(baseCursor)
@@ -850,7 +826,6 @@ class TextBox(WidgetBase):
         return self.selectionStart, self.selectionEnd
 
     def _setVisualLines(self, startLine: int = 0, startColumn: int = 0) -> None:
-        self._widthCache.clear()
         self._renderedTextCache.clear()
         startLine = max(0, min(startLine, len(self.text) - 1))
         startColumn = max(0, startColumn)
@@ -909,7 +884,6 @@ class TextBox(WidgetBase):
                         start = end
 
         self.updateLayout()
-        self._widthCache.clear()
 
     def _getReflowStart(self, lineIndex: int, column: int) -> tuple[int, int]:
         lineStart, lineEnd = self.visualLineRanges.get(
