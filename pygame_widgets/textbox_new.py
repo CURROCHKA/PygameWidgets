@@ -8,6 +8,8 @@ from pygame_widgets.mouse import Mouse, MouseState
 from bisect import bisect_right
 from dataclasses import dataclass
 
+from typing import Literal
+
 
 @dataclass
 class Cursor:
@@ -182,7 +184,7 @@ class TextBox(WidgetBase):
             return
 
         if self.keyDown:
-            self.updateRepeatEvent()
+            self._updateRepeatEvent()
 
         # Selection
         mouseState = Mouse.getMouseState()
@@ -199,24 +201,24 @@ class TextBox(WidgetBase):
                 self.showCursor = True
                 self.cursorTime = now
 
-                self._setColumnFromMouse(x, y)
+                self.setColumnFromMouse(x, y)
                 if self.isDoubleClick:
-                    self._moveCursorWordLeft()
+                    self.moveCursorWordLeft()
                     self.selectionStart.set(self.cursor.line, self.cursor.column, self.text)
-                    self._moveCursorWordRight()
+                    self.moveCursorWordRight()
                     self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
                 else:
                     self.resetSelection()
-                self._setPreferredColumn()
+                self.setPreferredColumn()
 
             else:
                 self.escape()
 
         elif mouseState == MouseState.DRAG and self.selected and not self.isDoubleClick:
             self.cursorTime = pygame.time.get_ticks()
-            self._setColumnFromMouse(x, y)
+            self.setColumnFromMouse(x, y)
             self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
-            self._setPreferredColumn()
+            self.setPreferredColumn()
 
         # Keyboard Input
         if self.selected:
@@ -343,7 +345,7 @@ class TextBox(WidgetBase):
             if self.isEmptySelection():
                 self.resetSelection()
 
-            self._moveCursorWordLeft()
+            self.moveCursorWordLeft()
             self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
             self.eraseSelectedText()
 
@@ -356,7 +358,7 @@ class TextBox(WidgetBase):
             self.cursor.set(self.cursor.line, self.cursor.column - 1, self.text)
 
             self._setVisualLines(self.cursor.line, reflowStartColumn)
-            self._setPreferredColumn()
+            self.setPreferredColumn()
             self.onTextChanged(*self.onTextChangedParams)
 
         elif self.cursor.line > 0:
@@ -366,7 +368,7 @@ class TextBox(WidgetBase):
             self.cursor.set(self.cursor.line - 1, previousLineLength, self.text)
 
             self._setVisualLines(self.cursor.line, previousLineLength)
-            self._setPreferredColumn()
+            self.setPreferredColumn()
             self.onTextChanged(*self.onTextChangedParams)
 
         self._ensureCursorVisible()
@@ -382,7 +384,7 @@ class TextBox(WidgetBase):
             if self.isEmptySelection():
                 self.resetSelection()
 
-            self._moveCursorWordRight()
+            self.moveCursorWordRight()
             self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
             self.eraseSelectedText()
 
@@ -395,7 +397,7 @@ class TextBox(WidgetBase):
             )
 
             self._setVisualLines(self.cursor.line, reflowStartColumn)
-            self._setPreferredColumn()
+            self.setPreferredColumn()
             self.onTextChanged(*self.onTextChangedParams)
 
         elif self.cursor.line < len(self.text) - 1:
@@ -404,80 +406,25 @@ class TextBox(WidgetBase):
             self.text.pop(self.cursor.line + 1)
 
             self._setVisualLines(self.cursor.line, reflowStartColumn)
-            self._setPreferredColumn()
+            self.setPreferredColumn()
             self.onTextChanged(*self.onTextChangedParams)
 
         self._ensureCursorVisible()
 
     def _handleUp(self, event: pygame.Event) -> None:
-        if self.isEmptySelection():
-            self.resetSelection()
-
-        visualLineIndex = self.getCurrentVisualLineIndex()
-
-        if visualLineIndex != -1:
-            if visualLineIndex > 0:
-                previousLine = self.cachedVisualLines[visualLineIndex - 1]
-
-                desiredColumn = min(
-                    previousLine['startAt'] + self.cursor.preferredColumn,
-                    previousLine['startAt'] + len(previousLine['text']),
-                )
-
-                self.cursor.set(
-                    previousLine['lineIndex'],
-                    desiredColumn,
-                    self.text,
-                )
-
-            else:
-                self.cursor.set(self.cursor.line, 0, self.text)
-                self._setPreferredColumn()
-
-            if event.mod & pygame.KMOD_SHIFT:
-                self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)            
-
-        self._ensureCursorVisible()
+        shiftPressed = bool(event.mod & pygame.KMOD_SHIFT)
+        self.moveCursorVertical(-1, shiftPressed)
 
     def _handleDown(self, event: pygame.Event) -> None:
-        if self.isEmptySelection():
-            self.resetSelection()
-
-        visualLineIndex = self.getCurrentVisualLineIndex()
-
-        if visualLineIndex != -1:
-            if visualLineIndex + 1 < len(self.cachedVisualLines):
-                nextLine = self.cachedVisualLines[visualLineIndex + 1]
-
-                desiredColumn = min(
-                    nextLine['startAt'] + self.cursor.preferredColumn,
-                    nextLine['startAt'] + len(nextLine['text']),
-                )
-
-                self.cursor.set(
-                    nextLine['lineIndex'], desiredColumn, self.text
-                )
-
-            else:
-                visualLine = self.cachedVisualLines[visualLineIndex]
-                self.cursor.set(
-                    self.cursor.line,
-                    visualLine['startAt'] + len(visualLine['text']),
-                    self.text,
-                )
-                self._setPreferredColumn()
-
-            if event.mod & pygame.KMOD_SHIFT:
-                self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)            
-
-        self._ensureCursorVisible()
+        shiftPressed = bool(event.mod & pygame.KMOD_SHIFT)
+        self.moveCursorVertical(1, shiftPressed)
 
     def _handleLeft(self, event: pygame.Event) -> None:
         if self.isEmptySelection():
             self.resetSelection()
 
         if event.mod & pygame.KMOD_CTRL:
-            self._moveCursorWordLeft()
+            self.moveCursorWordLeft()
 
         elif self.cursor.column == 0 and self.cursor.line > 0:
             self.cursor.set(
@@ -495,7 +442,7 @@ class TextBox(WidgetBase):
             self.cursor.set(start.line, start.column, self.text)
             self.resetSelection()
 
-        self._setPreferredColumn()
+        self.setPreferredColumn()
         self._ensureCursorVisible()
 
     def _handleRight(self, event: pygame.Event) -> None:
@@ -503,7 +450,7 @@ class TextBox(WidgetBase):
             self.resetSelection()
 
         if event.mod & pygame.KMOD_CTRL:
-            self._moveCursorWordRight()
+            self.moveCursorWordRight()
             
         elif self.cursor.column == len(
             self.text[self.cursor.line]
@@ -521,7 +468,7 @@ class TextBox(WidgetBase):
             self.cursor.set(end.line, end.column, self.text)
             self.resetSelection()
 
-        self._setPreferredColumn()
+        self.setPreferredColumn()
         self._ensureCursorVisible()
 
     def _handleHome(self, event: pygame.Event) -> None:
@@ -532,7 +479,7 @@ class TextBox(WidgetBase):
             self.cursor.set(0, 0, self.text)
 
         else:
-            visualLineIndex = self.getCurrentVisualLineIndex()
+            visualLineIndex = self.getVisualLineIndex(self.cursor)
 
             if visualLineIndex != -1:
                 visualLine = self.cachedVisualLines[visualLineIndex]
@@ -543,7 +490,7 @@ class TextBox(WidgetBase):
         else:
             self.resetSelection()
 
-        self._setPreferredColumn()
+        self.setPreferredColumn()
 
         self._ensureCursorVisible()
 
@@ -555,7 +502,7 @@ class TextBox(WidgetBase):
             self.cursor.set(len(self.text) - 1, len(self.text[-1]), self.text)
 
         else:
-            visualLineIndex = self.getCurrentVisualLineIndex()
+            visualLineIndex = self.getVisualLineIndex(self.cursor)
 
             if visualLineIndex != -1:
                 visualLine = self.cachedVisualLines[visualLineIndex]
@@ -570,7 +517,7 @@ class TextBox(WidgetBase):
         else:
             self.resetSelection()
 
-        self._setPreferredColumn()
+        self.setPreferredColumn()
 
         self._ensureCursorVisible()
 
@@ -611,7 +558,7 @@ class TextBox(WidgetBase):
 
     def _drawCursor(self) -> None:
         if self.selected and self.showCursor:
-            visualLineIndex = self.getCurrentVisualLineIndex()
+            visualLineIndex = self.getVisualLineIndex(self.cursor)
 
             if not (
                 self.firstVisibleLineIndex
@@ -720,7 +667,7 @@ class TextBox(WidgetBase):
             textWidth = textUpToEndWidth - textBeforeWidth
 
             if isEmptyLine or isEndOfLogicalLine:
-                textWidth += self._getTextWidth(' ')
+                textWidth += self.getTextWidth(' ')
 
             pygame.draw.rect(
                 self.win,
@@ -728,7 +675,43 @@ class TextBox(WidgetBase):
                 (self._actualX + textBeforeWidth, lineY, textWidth, self.lineHeight),
             )
 
-    def updateRepeatEvent(self) -> None:
+    def moveCursorVertical(self, direction: Literal[-1, 1], extendSelection: bool):
+        if extendSelection and self.isEmptySelection():
+            self.selectionStart.set(self.cursor.line, self.cursor.column, self.text)
+
+        baseCursor = self.cursor
+        if not extendSelection and not self.isEmptySelection():
+            start, end = self.getNormalizeSelection()
+            baseCursor = start if direction == -1 else end
+            self.resetSelection()
+
+        visualLineIndex = self.getVisualLineIndex(baseCursor)
+        if visualLineIndex == -1:
+            return
+        
+        targetIndex = visualLineIndex + direction
+
+        if 0 <= targetIndex < len(self.cachedVisualLines):
+            targetLine = self.cachedVisualLines[targetIndex]
+            desiredColumn = min(
+                targetLine['startAt'] + self.cursor.preferredColumn,
+                targetLine['startAt'] + len(targetLine['text'])
+            )
+            self.cursor.set(targetLine['lineIndex'], desiredColumn, self.text)
+        else:
+            if direction == -1:
+                self.cursor.set(self.cursor.line, 0, self.text)
+            else:
+                currentLine = self.cachedVisualLines[visualLineIndex]
+                self.cursor.set(self.cursor.line, currentLine['startAt'] + len(currentLine['text']), self.text)
+            self.setPreferredColumn()
+
+        if extendSelection:
+            self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
+
+        self._ensureCursorVisible()
+
+    def _updateRepeatEvent(self) -> None:
         if self.repeatEvent is None:
             return
 
@@ -755,7 +738,7 @@ class TextBox(WidgetBase):
             )
 
     def _ensureCursorVisible(self) -> None:
-        visualLineIndex = self.getCurrentVisualLineIndex()
+        visualLineIndex = self.getVisualLineIndex(self.cursor)
         if visualLineIndex == -1:
             return
 
@@ -768,7 +751,7 @@ class TextBox(WidgetBase):
         maxScroll = max(0, len(self.cachedVisualLines) - self.maxVisibleLines)
         self.firstVisibleLineIndex = max(0, min(self.firstVisibleLineIndex, maxScroll))
 
-    def _updateLayout(self) -> None:
+    def updateLayout(self) -> None:
         neededHeight = (
             len(self.cachedVisualLines) * self.lineHeight
             + self.textOffsetTop
@@ -828,7 +811,7 @@ class TextBox(WidgetBase):
                 self.text[self.cursor.line] += rightPart
 
         self._setVisualLines(reflowStartLine, reflowStartColumn)
-        self._setPreferredColumn()
+        self.setPreferredColumn()
         self.resetSelection()
         self._ensureCursorVisible()
         if callOnTextChanged:
@@ -855,7 +838,7 @@ class TextBox(WidgetBase):
         self.resetSelection()
 
         self._setVisualLines(reflowStartLine, reflowStartColumn)
-        self._setPreferredColumn()
+        self.setPreferredColumn()
         if callOnTextChanged:
             self.onTextChanged(*self.onTextChangedParams)
 
@@ -899,7 +882,7 @@ class TextBox(WidgetBase):
 
             start = lineStartColumn if lineIndex == startLine else 0
             while start < len(line):
-                end = self._findVisualLineEnd(line, start)
+                end = self.findVisualLineEnd(line, start)
 
                 if end == len(line):
                     self._appendVisualLine(line[start:end], lineIndex, start)
@@ -923,7 +906,7 @@ class TextBox(WidgetBase):
                         self._appendVisualLine(line[start:end], lineIndex, start)
                         start = end
 
-        self._updateLayout()
+        self.updateLayout()
         self._widthCache.clear()
 
     def _getReflowStart(self, lineIndex: int, column: int) -> tuple[int, int]:
@@ -972,13 +955,13 @@ class TextBox(WidgetBase):
         else:
             self.visualLineRanges[lineIndex] = (visualLineIndex, visualLineIndex + 1)
 
-    def _findVisualLineEnd(self, line: str, start: int) -> int:
+    def findVisualLineEnd(self, line: str, start: int) -> int:
         return (
             bisect_right(
                 range(len(line) + 1),
                 self._actualWidth,
                 lo=start + 1,
-                key=lambda end: self._getTextWidth(line[start:end]),
+                key=lambda end: self.getTextWidth(line[start:end]),
             )
             - 1
         )
@@ -987,30 +970,30 @@ class TextBox(WidgetBase):
         self.selectionStart.set(self.cursor.line, self.cursor.column, self.text)
         self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
 
-    def getCurrentVisualLineIndex(self) -> int:
+    def getVisualLineIndex(self, cursor: Cursor) -> int:
         startIndex, endIndex = self.visualLineRanges.get(
-            self.cursor.line, (0, len(self.cachedVisualLines))
+            cursor.line, (0, len(self.cachedVisualLines))
         )
 
         for lineIndex in range(startIndex, endIndex):
             visualLine = self.cachedVisualLines[lineIndex]
 
-            if visualLine['lineIndex'] != self.cursor.line:
+            if visualLine['lineIndex'] != cursor.line:
                 continue
 
             lineWidth = visualLine['startAt'] + len(visualLine['text'])
-            if visualLine['startAt'] <= self.cursor.column <= lineWidth:
+            if visualLine['startAt'] <= cursor.column <= lineWidth:
                 if (
-                    self.cursor.column == lineWidth != 0
+                    cursor.column == lineWidth != 0
                     and lineIndex + 1 < len(self.cachedVisualLines)
                     and self.cachedVisualLines[lineIndex + 1]['lineIndex']
-                    == self.cursor.line
+                    == cursor.line
                 ):
                     return lineIndex + 1
                 return lineIndex
         return -1
 
-    def _getTextWidth(self, text: str) -> int:
+    def getTextWidth(self, text: str) -> int:
         if text not in self._widthCache:
             self._widthCache[text] = self.font.size(text)[0]
         return self._widthCache[text]
@@ -1019,7 +1002,7 @@ class TextBox(WidgetBase):
         widths = [0]
 
         for column in range(1, len(text) + 1):
-            widths.append(self._getTextWidth(text[:column]))
+            widths.append(self.getTextWidth(text[:column]))
 
         return widths
 
@@ -1081,8 +1064,8 @@ class TextBox(WidgetBase):
         self.resetSelection()
         self.addText(text)
 
-    def _setPreferredColumn(self) -> None:
-        visualLineIndex = self.getCurrentVisualLineIndex()
+    def setPreferredColumn(self) -> None:
+        visualLineIndex = self.getVisualLineIndex(self.cursor)
 
         if visualLineIndex != -1:
             visualLine = self.cachedVisualLines[visualLineIndex]
@@ -1090,7 +1073,7 @@ class TextBox(WidgetBase):
 
             self.cursor.preferredColumn = relativeColumn
 
-    def _moveCursorWordLeft(self) -> None:
+    def moveCursorWordLeft(self) -> None:
         if self.cursor.column == 0 and self.cursor.line > 0:
             self.cursor.set(
                 self.cursor.line - 1,
@@ -1110,7 +1093,7 @@ class TextBox(WidgetBase):
         ):
             self.cursor.set(self.cursor.line, self.cursor.column - 1, self.text)
 
-    def _moveCursorWordRight(self) -> None:
+    def moveCursorWordRight(self) -> None:
         if self.cursor.column == len(
             self.text[self.cursor.line]
         ) and self.cursor.line + 1 < len(self.text):
@@ -1128,7 +1111,7 @@ class TextBox(WidgetBase):
         ):
             self.cursor.set(self.cursor.line, self.cursor.column + 1, self.text)
 
-    def _setColumnFromMouse(self, mouseX: int, mouseY: int) -> None:
+    def setColumnFromMouse(self, mouseX: int, mouseY: int) -> None:
         if not self.cachedVisualLines:
             return
 
