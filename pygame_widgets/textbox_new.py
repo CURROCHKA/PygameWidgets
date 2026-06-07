@@ -7,6 +7,7 @@ from pygame_widgets.mouse import Mouse, MouseState
 
 from bisect import bisect_right
 from dataclasses import dataclass, field
+from collections import OrderedDict
 
 from typing import Literal
 
@@ -148,7 +149,7 @@ class TextBox(WidgetBase):
         self.maxVisibleLines = max(1, self._actualHeight // self.lineHeight)
 
         self._widthCache = {}
-        self._renderedTextCache = {}
+        self._renderedTextCache = OrderedDict()
 
     def listen(self, events) -> None:
         '''Wait for inputs
@@ -519,7 +520,7 @@ class TextBox(WidgetBase):
                         textSurface = self._getRenderedTextSurface(' ', self.textColour)
                     else:
                         textSurface = self._getRenderedTextSurface(self.text[self.cursor.line][self.cursor.column], self.textColour)
-                    cursorSurface = pygame.Surface((textSurface.width, textSurface.height))
+                    cursorSurface = pygame.Surface(textSurface.get_size())
                     cursorSurface.fill(self.cursorColour)
                     cursorSurface.set_alpha(self.cursorAlpha)
                     self.win.blit(cursorSurface, (startX, startY))
@@ -971,22 +972,18 @@ class TextBox(WidgetBase):
         return prefixWidths[column]
 
     def _getRenderedTextSurface(self, text: str, colour) -> pygame.Surface:
-        cacheKey = (id(self.font), text, self._getColourCacheKey(colour))
+        cacheKey = (id(self.font), text, colour)
 
-        if cacheKey not in self._renderedTextCache:
-            if len(self._renderedTextCache) > 500:
-                self._renderedTextCache.clear()
-                
-            self._renderedTextCache[cacheKey] = self.font.render(text, True, colour)
+        if cacheKey in self._renderedTextCache:
+            self._renderedTextCache.move_to_end(cacheKey)
+            return self._renderedTextCache[cacheKey]
 
-        return self._renderedTextCache[cacheKey]
+        if len(self._renderedTextCache) >= 500:
+            self._renderedTextCache.popitem(last=False)
 
-    @staticmethod
-    def _getColourCacheKey(colour):
-        try:
-            return tuple(colour)
-        except TypeError:
-            return colour
+        rendered = self.font.render(text, True, colour)
+        self._renderedTextCache[cacheKey] = rendered
+        return rendered
 
     def updateCursor(self) -> None:
         now = pygame.time.get_ticks()
