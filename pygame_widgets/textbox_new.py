@@ -34,6 +34,8 @@ class TextBox(WidgetBase):
     REPEAT_INTERVAL = 70
     CURSOR_INTERVAL = 400
     DOUBLE_CLICK_INTERVAL = 300
+    RENDER_CACHE_SIZE = 500
+    WIDTH_CACHE_SIZE = 1000
 
     def __init__(
             self,
@@ -148,7 +150,7 @@ class TextBox(WidgetBase):
         self.firstVisibleLineIndex = 0
         self.maxVisibleLines = max(1, self._actualHeight // self.lineHeight)
 
-        self._widthCache = {}
+        self._widthCache = OrderedDict()
         self._renderedTextCache = OrderedDict()
 
     def listen(self, events) -> None:
@@ -178,7 +180,7 @@ class TextBox(WidgetBase):
                 self.showCursor = True
                 self.cursorTime = now
 
-                self.setColumnFromMouse(x, y)
+                self.setCursorFromMouse(x, y)
                 if self.isDoubleClick:
                     self.moveCursorWord(direction=-1)
                     self.selectionStart.set(self.cursor.line, self.cursor.column, self.text)
@@ -193,7 +195,7 @@ class TextBox(WidgetBase):
 
         elif mouseState == MouseState.DRAG and self.selected and not self.isDoubleClick:
             self.cursorTime = pygame.time.get_ticks()
-            self.setColumnFromMouse(x, y)
+            self.setCursorFromMouse(x, y)
             self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
             self.setPreferredColumn()
 
@@ -215,15 +217,7 @@ class TextBox(WidgetBase):
                     self._processKeyDown(event)
 
                 elif event.type == pygame.TEXTINPUT:
-                    if not self.readOnly:
-                        now = pygame.time.get_ticks()
-                        self.showCursor = True
-                        self.keyDown = True
-                        self.repeatEvent = event
-                        self.repeatTime = now
-                        self.cursorTime = now
-                        if len(event.text) != 0:
-                            self.addText(event.text)
+                    self._processTextInput(event)
 
                 elif event.type == pygame.KEYUP:
                     self.repeatEvent = None
@@ -318,6 +312,17 @@ class TextBox(WidgetBase):
 
         elif event.key == pygame.K_ESCAPE:
             self.escape()
+
+    def _processTextInput(self, event: pygame.Event) -> None:
+        if not self.readOnly:
+            now = pygame.time.get_ticks()
+            self.showCursor = True
+            self.keyDown = True
+            self.repeatEvent = event
+            self.repeatTime = now
+            self.cursorTime = now
+            if len(event.text) != 0:
+                self.addText(event.text)
 
     def _handleBackspace(self, event: pygame.Event) -> None:
         if self.readOnly:
@@ -694,11 +699,17 @@ class TextBox(WidgetBase):
             if now - self.repeatTime >= self.REPEAT_DELAY:
                 self.firstRepeat = False
                 self.repeatTime = now
-                self._processKeyDown(self.repeatEvent)
+                if self.repeatEvent.type == pygame.KEYDOWN:
+                    self._processKeyDown(self.repeatEvent)
+                elif self.repeatEvent.type == pygame.TEXTINPUT:
+                    self._processTextInput(self.repeatEvent)
 
         elif now - self.repeatTime >= self.REPEAT_INTERVAL:
             self.repeatTime = now
-            self._processKeyDown(self.repeatEvent)
+            if self.repeatEvent.type == pygame.KEYDOWN:
+                self._processKeyDown(self.repeatEvent)
+            elif self.repeatEvent.type == pygame.TEXTINPUT:
+                self._processTextInput(self.repeatEvent)
 
     def _ensureCursorVisible(self) -> None:
         visualLineIndex = self.getVisualLineIndex(self.cursor)
@@ -954,9 +965,17 @@ class TextBox(WidgetBase):
         return -1
 
     def getTextWidth(self, text: str) -> int:
-        if text not in self._widthCache:
-            self._widthCache[text] = self.font.size(text)[0]
-        return self._widthCache[text]
+        if text in self._widthCache:
+            self._widthCache.move_to_end(text)
+            return self._widthCache[text]
+        
+        if len(self._widthCache) >= self.WIDTH_CACHE_SIZE:
+            self._widthCache.popitem(last=False)
+
+        width = self.font.size(text)[0]
+        self._widthCache[text] = width
+
+        return width
 
     def _buildPrefixWidths(self, text: str) -> list[int]:
         widths = [0]
@@ -978,7 +997,7 @@ class TextBox(WidgetBase):
             self._renderedTextCache.move_to_end(cacheKey)
             return self._renderedTextCache[cacheKey]
 
-        if len(self._renderedTextCache) >= 500:
+        if len(self._renderedTextCache) >= self.RENDER_CACHE_SIZE:
             self._renderedTextCache.popitem(last=False)
 
         rendered = self.font.render(text, True, colour)
@@ -997,6 +1016,9 @@ class TextBox(WidgetBase):
     def copySelectedText(self) -> None:
         if not self.isEmptySelection():
             pyperclip.copy(self.getSelectedText())
+
+    def isWordChar(self, character: str) -> bool:
+        return character.isalnum() or character == '_'
 
     def isEmptySelection(self) -> bool:
         return (self.selectionStart.line, self.selectionStart.column) == (
@@ -1043,59 +1065,54 @@ class TextBox(WidgetBase):
             col = 0
 
         offset = -1 if direction == -1 else 0
-        while 0 <= col + offset < len(currentLine) and not currentLine[col + offset].isalnum():
+        while 0 <= col + offset < len(currentLine) and not self.isWordChar(currentLine[col + offset]):
             col += direction
 
-        while 0 <= col + offset < len(currentLine) and currentLine[col + offset].isalnum():
+        while 0 <= col + offset < len(currentLine) and self.isWordChar(currentLine[col + offset]):
             col += direction
 
         self.cursor.set(line, col, self.text)
 
-    def setColumnFromMouse(self, mouseX: int, mouseY: int) -> None:
+    def setCursorFromMouse(self, mouseX: int, mouseY: int) -> None:
         if not self.cachedVisualLines:
             return
 
-        minVisibleY = self._actualY + self.lineHeight // 2
-        maxVisibleY = self._actualY + self._actualHeight - self.lineHeight // 2
-        mouseY = max(minVisibleY, min(mouseY, maxVisibleY))
+        clampedY = max(self._actualY, min(mouseY, self._actualY + self._actualHeight - 1))
 
-        for i, visualLine in enumerate(self.cachedVisualLines):
-            if not (
-                self.firstVisibleLineIndex
-                <= i
-                < self.firstVisibleLineIndex + self.maxVisibleLines
-            ):
-                continue
+        rawIndex = self.firstVisibleLineIndex + (clampedY - self._actualY) // self.lineHeight
+        visualLineIndex = max(
+            self.firstVisibleLineIndex,
+            min(
+                rawIndex,
+                self.firstVisibleLineIndex + self.maxVisibleLines - 1,
+                len(self.cachedVisualLines) - 1,
+            ),
+        )
 
-            lineY = self._actualY + self.lineHeight * (i - self.firstVisibleLineIndex)
+        visualLine = self.cachedVisualLines[visualLineIndex]
 
-            if lineY <= mouseY < lineY + self.lineHeight:
-                if visualLine['lineIndex'] != self.cursor.line:
-                    self.cursor.set(
-                        visualLine['lineIndex'], self.cursor.column, self.text
-                    )
+        if visualLine['lineIndex'] != self.cursor.line:
+            self.cursor.set(visualLine['lineIndex'], self.cursor.column, self.text)
 
-                if len(visualLine['text']) == 0:
-                    self.cursor.set(self.cursor.line, visualLine['startAt'], self.text)
-                    break
+        if len(visualLine['text']) == 0:
+            self.cursor.set(self.cursor.line, visualLine['startAt'], self.text)
+            return
 
-                relativeX = mouseX - self._actualX
-                prefixWidths = visualLine['prefixWidths']
-                relativeColumn = len(visualLine['text'])
+        relativeX = mouseX - self._actualX
+        prefixWidths = visualLine['prefixWidths']
+        relativeColumn = len(visualLine['text'])
 
-                for column in range(len(visualLine['text'])):
-                    midpoint = (prefixWidths[column] + prefixWidths[column + 1]) / 2
-                    if relativeX < midpoint:
-                        relativeColumn = column
-                        break
-
-                self.cursor.set(
-                    self.cursor.line,
-                    visualLine['startAt'] + relativeColumn,
-                    self.text,
-                )
-
+        for column in range(len(visualLine['text'])):
+            midpoint = (prefixWidths[column] + prefixWidths[column + 1]) / 2
+            if relativeX < midpoint:
+                relativeColumn = column
                 break
+
+        self.cursor.set(
+            self.cursor.line,
+            visualLine['startAt'] + relativeColumn,
+            self.text,
+        )
 
     def getText(self) -> str:
         return '\n'.join(self.text)
