@@ -179,9 +179,9 @@ class TextBox(WidgetBase):
 
                 self.setColumnFromMouse(x, y)
                 if self.isDoubleClick:
-                    self.moveCursorWordLeft()
+                    self.moveCursorWord(direction=-1)
                     self.selectionStart.set(self.cursor.line, self.cursor.column, self.text)
-                    self.moveCursorWordRight()
+                    self.moveCursorWord(direction=1)
                     self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
                 else:
                     self.resetSelection()
@@ -229,7 +229,7 @@ class TextBox(WidgetBase):
                     self.keyDown = False
                     self.firstRepeat = True
 
-    def _processKeyDown(self, event: pygame.Event):
+    def _processKeyDown(self, event: pygame.Event) -> None:
         now = pygame.time.get_ticks()
         self.showCursor = True
         self.keyDown = True
@@ -257,25 +257,25 @@ class TextBox(WidgetBase):
             pygame.K_UP,
             pygame.K_KP_8 if not event.mod & pygame.KMOD_NUM else -1,
         ]:
-            self._handleUp(event)
+            self.moveCursorVertical(event, direction=-1)
 
         elif event.key in [
             pygame.K_DOWN,
             pygame.K_KP_2 if not event.mod & pygame.KMOD_NUM else -1,
         ]:
-            self._handleDown(event)
+            self.moveCursorVertical(event, direction=1)
 
         elif event.key in [
             pygame.K_LEFT,
             pygame.K_KP_4 if not event.mod & pygame.KMOD_NUM else -1,
         ]:
-            self._handleLeft(event)
+            self.moveCursorHorizontal(event, direction=-1)
 
         elif event.key in [
             pygame.K_RIGHT,
             pygame.K_KP_6 if not event.mod & pygame.KMOD_NUM else -1,
         ]:
-            self._handleRight(event)
+            self.moveCursorHorizontal(event, direction=1)
 
         elif event.key in [
             pygame.K_HOME,
@@ -330,7 +330,7 @@ class TextBox(WidgetBase):
             if self.isEmptySelection():
                 self.resetSelection()
 
-            self.moveCursorWordLeft()
+            self.moveCursorWord(direction=-1)
             self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
             self.eraseSelectedText()
 
@@ -369,7 +369,7 @@ class TextBox(WidgetBase):
             if self.isEmptySelection():
                 self.resetSelection()
 
-            self.moveCursorWordRight()
+            self.moveCursorWord(direction=1)
             self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
             self.eraseSelectedText()
 
@@ -394,66 +394,6 @@ class TextBox(WidgetBase):
             self.setPreferredColumn()
             self.onTextChanged(*self.onTextChangedParams)
 
-        self._ensureCursorVisible()
-
-    def _handleUp(self, event: pygame.Event) -> None:
-        shiftPressed = bool(event.mod & pygame.KMOD_SHIFT)
-        self.moveCursorVertical(-1, shiftPressed)
-
-    def _handleDown(self, event: pygame.Event) -> None:
-        shiftPressed = bool(event.mod & pygame.KMOD_SHIFT)
-        self.moveCursorVertical(1, shiftPressed)
-
-    def _handleLeft(self, event: pygame.Event) -> None:
-        if self.isEmptySelection():
-            self.resetSelection()
-
-        if event.mod & pygame.KMOD_CTRL:
-            self.moveCursorWordLeft()
-
-        elif self.cursor.column == 0 and self.cursor.line > 0:
-            self.cursor.set(
-                self.cursor.line - 1, len(self.text[self.cursor.line - 1]), self.text
-            )
-
-        else:
-            self.cursor.set(self.cursor.line, max(self.cursor.column - 1, 0), self.text)
-
-        if event.mod & pygame.KMOD_SHIFT:
-            self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
-
-        elif not self.isEmptySelection():
-            start, _ = self.getNormalizeSelection()
-            self.cursor.set(start.line, start.column, self.text)
-            self.resetSelection()
-
-        self.setPreferredColumn()
-        self._ensureCursorVisible()
-
-    def _handleRight(self, event: pygame.Event) -> None:
-        if self.isEmptySelection():
-            self.resetSelection()
-
-        if event.mod & pygame.KMOD_CTRL:
-            self.moveCursorWordRight()
-            
-        elif self.cursor.column == len(
-            self.text[self.cursor.line]
-        ) and self.cursor.line + 1 < len(self.text):
-            self.cursor.set(self.cursor.line + 1, 0, self.text)
-
-        else:
-            self.cursor.set(self.cursor.line, self.cursor.column + 1, self.text)
-
-        if event.mod & pygame.KMOD_SHIFT:
-            self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
-            
-        elif not self.isEmptySelection():
-            _, end = self.getNormalizeSelection()
-            self.cursor.set(end.line, end.column, self.text)
-            self.resetSelection()
-
-        self.setPreferredColumn()
         self._ensureCursorVisible()
 
     def _handleHome(self, event: pygame.Event) -> None:
@@ -661,12 +601,14 @@ class TextBox(WidgetBase):
                 (self._actualX + textBeforeWidth, lineY, textWidth, self.lineHeight),
             )
 
-    def moveCursorVertical(self, direction: Literal[-1, 1], extendSelection: bool):
-        if extendSelection and self.isEmptySelection():
+    def moveCursorVertical(self, event: pygame.Event, direction: Literal[-1, 1]) -> None:
+        shiftPressed = bool(event.mod & pygame.KMOD_SHIFT)
+
+        if shiftPressed and self.isEmptySelection():
             self.selectionStart.set(self.cursor.line, self.cursor.column, self.text)
 
         baseCursor = Cursor(self.cursor.line, self.cursor.column)
-        if not extendSelection and not self.isEmptySelection():
+        if not shiftPressed and not self.isEmptySelection():
             start, end = self.getNormalizeSelection()
             baseCursor = start if direction == -1 else end
             self.cursor.set(baseCursor.line, baseCursor.column, self.text)
@@ -693,9 +635,52 @@ class TextBox(WidgetBase):
                 self.cursor.set(self.cursor.line, currentLine['startAt'] + len(currentLine['text']), self.text)
             self.setPreferredColumn()
 
-        if extendSelection:
+        if shiftPressed:
             self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
 
+        self._ensureCursorVisible()
+
+    def moveCursorHorizontal(self, event: pygame.Event, direction: Literal[-1, 1]) -> None:
+        shiftPressed = bool(event.mod & pygame.KMOD_SHIFT)
+        ctrlPressed = bool(event.mod & pygame.KMOD_CTRL)
+
+        if not self.isEmptySelection() and not shiftPressed:
+            start, end = self.getNormalizeSelection()
+            boundary = start if direction == -1 else end
+            self.cursor.set(boundary.line, boundary.column, self.text)
+            self.resetSelection()
+            self.setPreferredColumn()
+            self._ensureCursorVisible()
+            return
+
+        if shiftPressed and self.isEmptySelection():
+            self.resetSelection()
+
+        if ctrlPressed:
+            self.moveCursorWord(direction)
+        else:
+            line = self.cursor.line
+            col = self.cursor.column
+
+            if direction == -1:
+                if col == 0 and line > 0:
+                    line -= 1
+                    col = len(self.text[line])
+                else:
+                    col = max(col - 1, 0)
+            elif direction == 1:
+                if col == len(self.text[line]) and line < len(self.text) - 1:
+                    line += 1
+                    col = 0
+                else:
+                    col += 1
+
+            self.cursor.set(line, col, self.text)
+
+        if shiftPressed:
+            self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
+
+        self.setPreferredColumn()
         self._ensureCursorVisible()
 
     def _updateRepeatEvent(self) -> None:
@@ -1046,43 +1031,28 @@ class TextBox(WidgetBase):
 
             self.cursor.preferredColumn = relativeColumn
 
-    def moveCursorWordLeft(self) -> None:
-        if self.cursor.column == 0 and self.cursor.line > 0:
-            self.cursor.set(
-                self.cursor.line - 1,
-                len(self.text[self.cursor.line - 1]),
-                self.text,
-            )
+    def moveCursorWord(self, direction: Literal[-1, 1]) -> None:
+        line = self.cursor.line
+        col = self.cursor.column
+        currentLine = self.text[line]
 
-        while (
-            self.cursor.column - 1 >= 0
-            and not self.text[self.cursor.line][self.cursor.column - 1].isalnum()
-        ):
-            self.cursor.set(self.cursor.line, self.cursor.column - 1, self.text)
+        if direction == -1 and col == 0 and line > 0:
+            line -= 1
+            currentLine = self.text[line]
+            col = len(currentLine)
+        elif direction == 1 and col == len(currentLine) and line < len(self.text) - 1:
+            line += 1
+            currentLine = self.text[line]
+            col = 0
 
-        while (
-            self.cursor.column - 1 >= 0
-            and self.text[self.cursor.line][self.cursor.column - 1].isalnum()
-        ):
-            self.cursor.set(self.cursor.line, self.cursor.column - 1, self.text)
+        offset = -1 if direction == -1 else 0
+        while 0 <= col + offset < len(currentLine) and not currentLine[col + offset].isalnum():
+            col += direction
 
-    def moveCursorWordRight(self) -> None:
-        if self.cursor.column == len(
-            self.text[self.cursor.line]
-        ) and self.cursor.line + 1 < len(self.text):
-            self.cursor.set(self.cursor.line + 1, 0, self.text)
+        while 0 <= col + offset < len(currentLine) and currentLine[col + offset].isalnum():
+            col += direction
 
-        while (
-            self.cursor.column < len(self.text[self.cursor.line])
-            and not self.text[self.cursor.line][self.cursor.column].isalnum()
-        ):
-            self.cursor.set(self.cursor.line, self.cursor.column + 1, self.text)
-
-        while (
-            self.cursor.column < len(self.text[self.cursor.line])
-            and self.text[self.cursor.line][self.cursor.column].isalnum()
-        ):
-            self.cursor.set(self.cursor.line, self.cursor.column + 1, self.text)
+        self.cursor.set(line, col, self.text)
 
     def setColumnFromMouse(self, mouseX: int, mouseY: int) -> None:
         if not self.cachedVisualLines:
