@@ -233,10 +233,10 @@ class TextBox(WidgetBase):
         self.cursorTime = now
 
         if event.key == pygame.K_BACKSPACE:
-            self._handleBackspace(event)
+            self.eraseText(event, direction=-1)
 
         elif event.key == pygame.K_DELETE:
-            self._handleDelete(event)
+            self.eraseText(event, direction=1)
 
         elif event.key == pygame.K_RETURN:
             if (
@@ -323,84 +323,6 @@ class TextBox(WidgetBase):
             self.cursorTime = now
             if len(event.text) != 0:
                 self.addText(event.text)
-
-    def _handleBackspace(self, event: pygame.Event) -> None:
-        if self.readOnly:
-            return
-
-        if not self.isEmptySelection():
-            self.eraseSelectedText()
-
-        elif event.mod & pygame.KMOD_CTRL:
-            # This is necessary in order to set the start of the selection at the point
-            if self.isEmptySelection():
-                self.resetSelection()
-
-            self.moveCursorWord(direction=-1)
-            self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
-            self.eraseSelectedText()
-
-        elif self.cursor.column > 0:
-            reflowStartColumn = self.cursor.column - 1
-            self.text[self.cursor.line] = (
-                self.text[self.cursor.line][: self.cursor.column - 1]
-                + self.text[self.cursor.line][self.cursor.column :]
-            )
-            self.cursor.set(self.cursor.line, self.cursor.column - 1, self.text)
-
-            self._setVisualLines(self.cursor.line, reflowStartColumn)
-            self.setPreferredColumn()
-            self.onTextChanged(*self.onTextChangedParams)
-
-        elif self.cursor.line > 0:
-            previousLineLength = len(self.text[self.cursor.line - 1])
-            self.text[self.cursor.line - 1] += self.text[self.cursor.line]
-            self.text.pop(self.cursor.line)
-            self.cursor.set(self.cursor.line - 1, previousLineLength, self.text)
-
-            self._setVisualLines(self.cursor.line, previousLineLength)
-            self.setPreferredColumn()
-            self.onTextChanged(*self.onTextChangedParams)
-
-        self._ensureCursorVisible()
-
-    def _handleDelete(self, event: pygame.Event) -> None:
-        if self.readOnly:
-            return
-
-        if not self.isEmptySelection():
-            self.eraseSelectedText()
-
-        elif event.mod & pygame.KMOD_CTRL:
-            if self.isEmptySelection():
-                self.resetSelection()
-
-            self.moveCursorWord(direction=1)
-            self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
-            self.eraseSelectedText()
-
-        elif self.cursor.column < len(self.text[self.cursor.line]):
-            reflowStartColumn = self.cursor.column
-
-            self.text[self.cursor.line] = (
-                self.text[self.cursor.line][: self.cursor.column]
-                + self.text[self.cursor.line][self.cursor.column + 1 :]
-            )
-
-            self._setVisualLines(self.cursor.line, reflowStartColumn)
-            self.setPreferredColumn()
-            self.onTextChanged(*self.onTextChangedParams)
-
-        elif self.cursor.line < len(self.text) - 1:
-            reflowStartColumn = len(self.text[self.cursor.line])
-            self.text[self.cursor.line] += self.text[self.cursor.line + 1]
-            self.text.pop(self.cursor.line + 1)
-
-            self._setVisualLines(self.cursor.line, reflowStartColumn)
-            self.setPreferredColumn()
-            self.onTextChanged(*self.onTextChangedParams)
-
-        self._ensureCursorVisible()
 
     def _handleHome(self, event: pygame.Event) -> None:
         if self.isEmptySelection():
@@ -607,6 +529,101 @@ class TextBox(WidgetBase):
                 (self._actualX + textBeforeWidth, lineY, textWidth, self.lineHeight),
             )
 
+    def processBackspace(self) -> None:
+        if self.cursor.column > 0:
+            reflowStartColumn = self.cursor.column - 1
+            
+            self.text[self.cursor.line] = (
+                self.text[self.cursor.line][: self.cursor.column - 1]
+                + self.text[self.cursor.line][self.cursor.column :]
+            )
+            self.cursor.set(self.cursor.line, self.cursor.column - 1, self.text)
+
+            self._setVisualLines(self.cursor.line, reflowStartColumn)
+            self.setPreferredColumn()
+            self.onTextChanged(*self.onTextChangedParams)
+
+        elif self.cursor.line > 0:
+            previousLineLength = len(self.text[self.cursor.line - 1])
+            self.text[self.cursor.line - 1] += self.text[self.cursor.line]
+            self.text.pop(self.cursor.line)
+            self.cursor.set(self.cursor.line - 1, previousLineLength, self.text)
+
+            self._setVisualLines(self.cursor.line, previousLineLength)
+            self.setPreferredColumn()
+            self.onTextChanged(*self.onTextChangedParams)
+
+    def processDelete(self) -> None:
+        if self.cursor.column < len(self.text[self.cursor.line]):
+            reflowStartColumn = self.cursor.column
+
+            self.text[self.cursor.line] = (
+                self.text[self.cursor.line][: self.cursor.column]
+                + self.text[self.cursor.line][self.cursor.column + 1 :]
+            )
+
+            self._setVisualLines(self.cursor.line, reflowStartColumn)
+            self.setPreferredColumn()
+            self.onTextChanged(*self.onTextChangedParams)
+
+        elif self.cursor.line < len(self.text) - 1:
+            reflowStartColumn = len(self.text[self.cursor.line])
+            self.text[self.cursor.line] += self.text[self.cursor.line + 1]
+            self.text.pop(self.cursor.line + 1)
+
+            self._setVisualLines(self.cursor.line, reflowStartColumn)
+            self.setPreferredColumn()
+            self.onTextChanged(*self.onTextChangedParams)
+
+    def eraseText(self, event: pygame.Event, direction: Literal[-1, 1]) -> None:
+        if self.readOnly:
+            return
+        
+        if not self.isEmptySelection():
+            self.eraseSelectedText()
+            return
+
+        if event.mod & pygame.KMOD_CTRL:
+            self.selectionStart.set(self.cursor.line, self.cursor.column, self.text)
+            self.moveCursorWord(direction)
+            self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
+            self.eraseSelectedText()
+            return
+        
+        if direction == -1:
+            self.processBackspace()
+
+        elif direction == 1:
+            self.processDelete()
+
+        self._ensureCursorVisible()
+
+    def eraseSelectedText(self, callOnTextChanged: bool = True) -> None:
+        start, end = self.getNormalizeSelection()
+        reflowStartLine = start.line
+        reflowStartColumn = start.column
+
+        if start.line == end.line:
+            self.text[start.line] = (
+                self.text[start.line][: start.column]
+                + self.text[start.line][end.column :]
+            )
+        else:
+            self.text[start.line] = (
+                self.text[start.line][: start.column]
+                + self.text[end.line][end.column :]
+            )
+            del self.text[start.line + 1 : end.line + 1]
+
+        self.cursor.set(start.line, start.column, self.text)
+        self.resetSelection()
+
+        self._setVisualLines(reflowStartLine, reflowStartColumn)
+        self.setPreferredColumn()
+        self._ensureCursorVisible()
+        if callOnTextChanged:
+            self.onTextChanged(*self.onTextChangedParams)
+
     def moveCursorVertical(self, event: pygame.Event, direction: Literal[-1, 1]) -> None:
         shiftPressed = bool(event.mod & pygame.KMOD_SHIFT)
 
@@ -788,31 +805,6 @@ class TextBox(WidgetBase):
         self.setPreferredColumn()
         self.resetSelection()
         self._ensureCursorVisible()
-        if callOnTextChanged:
-            self.onTextChanged(*self.onTextChangedParams)
-
-    def eraseSelectedText(self, callOnTextChanged: bool = True) -> None:
-        start, end = self.getNormalizeSelection()
-        reflowStartLine = start.line
-        reflowStartColumn = start.column
-
-        if start.line == end.line:
-            self.text[start.line] = (
-                self.text[start.line][: start.column]
-                + self.text[start.line][end.column :]
-            )
-        else:
-            self.text[start.line] = (
-                self.text[start.line][: start.column]
-                + self.text[end.line][end.column :]
-            )
-            del self.text[start.line + 1 : end.line + 1]
-
-        self.cursor.set(start.line, start.column, self.text)
-        self.resetSelection()
-
-        self._setVisualLines(reflowStartLine, reflowStartColumn)
-        self.setPreferredColumn()
         if callOnTextChanged:
             self.onTextChanged(*self.onTextChangedParams)
 
