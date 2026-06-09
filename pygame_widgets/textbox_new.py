@@ -77,7 +77,7 @@ class TextBox(WidgetBase):
         # Cursor state and style
         self.cursor = Cursor()
         self.cursorWidth = kwargs.get('cursorWidth', 2)
-        self.cursorColour = kwargs.get('cursorColour', (0, 0, 0))
+        self.cursorcolor = kwargs.get('cursorcolor', (0, 0, 0))
         self.cursorAlpha = kwargs.get('cursorAlpha', 63)
         self.showCursor = not self.readOnly
         self.cursorTime = 0
@@ -96,7 +96,7 @@ class TextBox(WidgetBase):
         # Font style
         self.fontSize = kwargs.get('fontSize', 20)
         self.font = kwargs.get('font', pygame.font.SysFont('calibri', self.fontSize))
-        self.textColour = kwargs.get('textColour', (0, 0, 0))
+        self.textcolor = kwargs.get('textcolor', (0, 0, 0))
 
         # Margins
         self.textOffsetTop = self.fontSize // 3
@@ -105,17 +105,17 @@ class TextBox(WidgetBase):
 
         # Placeholder
         self.placeholderText = kwargs.get('placeholderText', '')
-        self.placeholderTextColour = kwargs.get('placeholderTextColour', (10, 10, 10))
+        self.placeholderTextcolor = kwargs.get('placeholderTextcolor', (10, 10, 10))
 
         # Widget style
-        self.colour = kwargs.get('colour', (220, 220, 220))
+        self.color = kwargs.get('color', (220, 220, 220))
         self.borderThickness = kwargs.get('borderThickness', 3)
-        self.borderColour = kwargs.get('borderColour', (0, 0, 0))
+        self.bordercolor = kwargs.get('bordercolor', (0, 0, 0))
         self.radius = kwargs.get('radius', 0)
 
         self.selectionStart = Cursor()
         self.selectionEnd = Cursor()
-        self.selectionColour = kwargs.get('selectionColour', (166, 210, 255))
+        self.selectioncolor = kwargs.get('selectioncolor', (166, 210, 255))
 
         # Callback
         self.onSubmit = kwargs.get('onSubmit', lambda *args: None)
@@ -350,10 +350,10 @@ class TextBox(WidgetBase):
             displayLines = [
                 {'text': self.placeholderText, 'lineIndex': 0, 'startAt': 0}
             ]
-            colour = self.placeholderTextColour
+            color = self.placeholderTextcolor
         else:
             displayLines = self.cachedVisualLines
-            colour = self.textColour
+            color = self.textcolor
 
         for i, visualLine in enumerate(displayLines):
             if not (
@@ -365,7 +365,7 @@ class TextBox(WidgetBase):
 
             lineY = self._actualY + (i - self.firstVisibleLineIndex) * self.lineHeight
 
-            textSurface = self.getRenderedTextSurface(visualLine['text'], colour)
+            textSurface = self.getRenderedTextSurface(visualLine['text'], color)
             self.win.blit(textSurface, (self._actualX, lineY))
 
     def _drawCursor(self) -> None:
@@ -394,28 +394,28 @@ class TextBox(WidgetBase):
                 if not self.insertOn:
                     pygame.draw.line(
                         self.win,
-                        self.cursorColour,
+                        self.cursorcolor,
                         (startX, startY),
                         (endX, endY),
                         self.cursorWidth,
                     )
                 else:
                     if self.cursor.column == len(self.text[self.cursor.line]):
-                        textSurface = self.getRenderedTextSurface(' ', self.textColour)
+                        textSurface = self.getRenderedTextSurface(' ', self.textcolor)
                     else:
                         textSurface = self.getRenderedTextSurface(
                             self.text[self.cursor.line][self.cursor.column],
-                            self.textColour,
+                            self.textcolor,
                         )
                     cursorSurface = pygame.Surface(textSurface.get_size())
-                    cursorSurface.fill(self.cursorColour)
+                    cursorSurface.fill(self.cursorcolor)
                     cursorSurface.set_alpha(self.cursorAlpha)
                     self.win.blit(cursorSurface, (startX, startY))
 
     def _drawBorder(self) -> None:
         pygame.draw.rect(
             self.win,
-            self.borderColour,
+            self.bordercolor,
             (self._x, self._y, self._width, self._height),
             border_radius=self.radius,
         )
@@ -427,7 +427,7 @@ class TextBox(WidgetBase):
             self._width - self.borderThickness * 2,
             self._height - self.borderThickness * 2,
         )
-        pygame.draw.rect(self.win, self.colour, rect, border_radius=self.radius)
+        pygame.draw.rect(self.win, self.color, rect, border_radius=self.radius)
 
     def _drawSelection(self) -> None:
         if self.isEmptySelection():
@@ -485,7 +485,7 @@ class TextBox(WidgetBase):
 
             pygame.draw.rect(
                 self.win,
-                self.selectionColour,
+                self.selectioncolor,
                 (self._actualX + textBeforeWidth, lineY, textWidth, self.lineHeight),
             )
 
@@ -984,16 +984,18 @@ class TextBox(WidgetBase):
         column = max(0, min(column, len(prefixWidths) - 1))
         return prefixWidths[column]
 
-    def getRenderedTextSurface(self, text: str, colour) -> pygame.Surface:
-        if text in self._renderedTextCache:
-            self._renderedTextCache.move_to_end(text)
-            return self._renderedTextCache[text]
+    def getRenderedTextSurface(self, text: str, color: tuple[int, int, int, int] | pygame.Color) -> pygame.Surface:
+        cacheKey = (text, color)
+
+        if cacheKey in self._renderedTextCache:
+            self._renderedTextCache.move_to_end(cacheKey)
+            return self._renderedTextCache[cacheKey]
 
         if len(self._renderedTextCache) >= self.RENDER_CACHE_SIZE:
             self._renderedTextCache.popitem(last=False)
 
-        rendered = self.font.render(text, True, colour)
-        self._renderedTextCache[text] = rendered
+        rendered = self.font.render(text, True, color)
+        self._renderedTextCache[cacheKey] = rendered
         return rendered
 
     def updateCursor(self) -> None:
@@ -1154,8 +1156,8 @@ if __name__ == '__main__':
         100,
         maxHeight=450,
         fontSize=50,
-        borderColour=(255, 0, 0),
-        textColour=(0, 200, 0),
+        bordercolor=(255, 0, 0),
+        textcolor=(0, 200, 0),
         onSubmit=output,
         radius=10,
         borderThickness=5,
