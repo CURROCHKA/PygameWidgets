@@ -1,6 +1,8 @@
 import pyperclip
+import sys
 
 import pygame
+import pygame.freetype
 import pygame_widgets
 from pygame_widgets.widget import WidgetBase
 from pygame_widgets.mouse import Mouse, MouseState
@@ -95,7 +97,8 @@ class TextBox(WidgetBase):
 
         # Font style
         self.fontSize = kwargs.get('fontSize', 20)
-        self.font = kwargs.get('font', pygame.font.SysFont('calibri', self.fontSize))
+        self.font = kwargs.get('font', pygame.freetype.SysFont('calibri', self.fontSize))
+        self.font.pad = True
         self.textcolor = kwargs.get('textcolor', (0, 0, 0))
 
         # Margins
@@ -141,7 +144,7 @@ class TextBox(WidgetBase):
         self._actualHeight = (
             self._height - self.textOffsetTop - self.borderThickness * 2
         )
-        self.lineHeight = self.font.get_linesize()
+        self.lineHeight = self.font.get_sized_height()
         self._actualX = self._x + self.textOffsetLeft + self.borderThickness
         self._actualY = self._y + self.textOffsetTop + self.borderThickness
 
@@ -966,17 +969,18 @@ class TextBox(WidgetBase):
         if len(self._widthCache) >= self.WIDTH_CACHE_SIZE:
             self._widthCache.popitem(last=False)
 
-        width = self.font.size(text)[0]
+        width = self.font.get_rect(text).width
         self._widthCache[text] = width
 
         return width
 
     def buildPrefixWidths(self, text: str) -> list[int]:
         widths = [0]
-
-        for column in range(1, len(text) + 1):
-            widths.append(self.getTextWidth(text[:column]))
-
+        metrics = self.font.get_metrics(text)
+        cumulative = 0
+        for glyph in metrics:
+            cumulative += glyph[4]
+            widths.append(cumulative)
         return widths
 
     def getVisualWidth(self, visualLine: dict, column: int) -> int:
@@ -994,7 +998,7 @@ class TextBox(WidgetBase):
         if len(self._renderedTextCache) >= self.RENDER_CACHE_SIZE:
             self._renderedTextCache.popitem(last=False)
 
-        rendered = self.font.render(text, True, color)
+        rendered = self.font.render(text, fgcolor=color)[0]
         self._renderedTextCache[cacheKey] = rendered
         return rendered
 
@@ -1171,7 +1175,7 @@ if __name__ == '__main__':
             if outerEvent.type == pygame.QUIT:
                 pygame.quit()
                 run = False
-                quit()
+                sys.exit()
 
         win.fill((255, 255, 255))
 
