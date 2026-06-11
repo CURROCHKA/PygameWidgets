@@ -11,7 +11,7 @@ from bisect import bisect_right
 from dataclasses import dataclass, field
 from collections import OrderedDict
 
-from typing import Literal
+from typing import Literal, NamedTuple
 
 
 @dataclass(order=True)
@@ -28,6 +28,13 @@ class Cursor:
         self.line = line
         self.column = column
         self.clamp(lines)
+
+
+class VisualLine(NamedTuple):
+    text: str
+    lineIndex: int
+    startAt: int
+    prefixWidths: list[int]
 
 
 class TextBox(WidgetBase):
@@ -89,10 +96,10 @@ class TextBox(WidgetBase):
 
         # Text state
         self.text = ['']
-        self.cachedVisualLines = [
-            {'text': '', 'lineIndex': 0, 'startAt': 0, 'prefixWidths': [0]}
+        self.cachedVisualLines: list[VisualLine] = [
+            VisualLine(text='', lineIndex=0, startAt=0, prefixWidths=[0])
         ]
-        self.visualLineRanges = {0: (0, 1)}
+        self.visualLineRanges: dict[int, tuple[int, int]] = {0: (0, 1)}
         self.tabSpaces = kwargs.get('tabSpaces', 4)
 
         # Font style
@@ -362,7 +369,9 @@ class TextBox(WidgetBase):
     def _drawText(self) -> None:
         if self.isEmptyText(self.text):
             displayLines = [
-                {'text': self.placeholderText, 'lineIndex': 0, 'startAt': 0}
+                VisualLine(
+                    text=self.placeholderText, lineIndex=0, startAt=0, prefixWidths=[0]
+                )
             ]
             color = self.placeholderTextcolor
         else:
@@ -378,8 +387,7 @@ class TextBox(WidgetBase):
                 continue
 
             lineY = self._actualY + (i - self.firstVisibleLineIndex) * self.lineHeight
-
-            textSurface = self.getRenderedTextSurface(visualLine['text'], color)
+            textSurface = self.getRenderedTextSurface(visualLine.text, color)
             self.win.blit(textSurface, (self._actualX, lineY))
 
     def _drawCursor(self) -> None:
@@ -396,7 +404,7 @@ class TextBox(WidgetBase):
             if visualLineIndex != -1:
                 visualLine = self.cachedVisualLines[visualLineIndex]
 
-                relativeColumn = self.cursor.column - visualLine['startAt']
+                relativeColumn = self.cursor.column - visualLine.startAt
                 startX = self._actualX + self.getVisualWidth(visualLine, relativeColumn)
                 endX = startX
 
@@ -457,14 +465,14 @@ class TextBox(WidgetBase):
             ):
                 continue
 
-            lineIndex = visualLine['lineIndex']
+            lineIndex = visualLine.lineIndex
 
             if not (start.line <= lineIndex <= end.line):
                 continue
 
             lineY = self._actualY + self.lineHeight * (i - self.firstVisibleLineIndex)
 
-            lineStart = visualLine['startAt']
+            lineStart = visualLine.startAt
 
             selectionStart = start.column if lineIndex == start.line else 0
             selectionEnd = (
@@ -472,7 +480,7 @@ class TextBox(WidgetBase):
             )
 
             localStart = max(0, selectionStart - lineStart)
-            localEnd = min(len(visualLine['text']), selectionEnd - lineStart)
+            localEnd = min(len(visualLine.text), selectionEnd - lineStart)
 
             if localStart > localEnd:
                 continue
@@ -481,8 +489,8 @@ class TextBox(WidgetBase):
 
             isEndOfLogicalLine = (
                 lineIndex < end.line
-                and localEnd == len(visualLine['text'])
-                and visualLine['startAt'] + len(visualLine['text'])
+                and localEnd == len(visualLine.text)
+                and visualLine.startAt + len(visualLine.text)
                 == len(self.text[lineIndex])
             )
 
@@ -612,9 +620,9 @@ class TextBox(WidgetBase):
             visualLineIndex = self.getVisualLineIndex(self.cursor)
             if visualLineIndex != -1:
                 visualLine = self.cachedVisualLines[visualLineIndex]
-                column = visualLine['startAt']
+                column = visualLine.startAt
                 if direction == 1:
-                    column += len(visualLine['text'])
+                    column += len(visualLine.text)
 
                 self.cursor.set(self.cursor.line, column, self.text)
 
@@ -650,10 +658,10 @@ class TextBox(WidgetBase):
         if 0 <= targetIndex < len(self.cachedVisualLines):
             targetLine = self.cachedVisualLines[targetIndex]
             desiredColumn = min(
-                targetLine['startAt'] + self.cursor.preferredColumn,
-                targetLine['startAt'] + len(targetLine['text']),
+                targetLine.startAt + self.cursor.preferredColumn,
+                targetLine.startAt + len(targetLine.text),
             )
-            self.cursor.set(targetLine['lineIndex'], desiredColumn, self.text)
+            self.cursor.set(targetLine.lineIndex, desiredColumn, self.text)
         else:
             if direction == -1:
                 self.cursor.set(self.cursor.line, 0, self.text)
@@ -661,7 +669,7 @@ class TextBox(WidgetBase):
                 currentLine = self.cachedVisualLines[visualLineIndex]
                 self.cursor.set(
                     self.cursor.line,
-                    currentLine['startAt'] + len(currentLine['text']),
+                    currentLine.startAt + len(currentLine.text),
                     self.text,
                 )
             self.setPreferredColumn()
@@ -889,35 +897,32 @@ class TextBox(WidgetBase):
 
         for visualLineIndex in range(lineStart, lineEnd):
             visualLine = self.cachedVisualLines[visualLineIndex]
-            visualLineEnd = visualLine['startAt'] + len(visualLine['text'])
+            visualLineEnd = visualLine.startAt + len(visualLine.text)
 
             if column < visualLineEnd:
-                return visualLineIndex, visualLine['startAt']
+                return visualLineIndex, visualLine.startAt
 
             if column == visualLineEnd:
                 nextVisualLineIndex = visualLineIndex + 1
                 if nextVisualLineIndex < lineEnd:
                     return (
                         nextVisualLineIndex,
-                        self.cachedVisualLines[nextVisualLineIndex]['startAt'],
+                        self.cachedVisualLines[nextVisualLineIndex].startAt,
                     )
-                return visualLineIndex, visualLine['startAt']
+                return visualLineIndex, visualLine.startAt
 
         if lineEnd > lineStart:
             lastVisualLine = self.cachedVisualLines[lineEnd - 1]
-            return lineEnd - 1, lastVisualLine['startAt']
+            return lineEnd - 1, lastVisualLine.startAt
 
         return len(self.cachedVisualLines), 0
 
     def _appendVisualLine(self, text: str, lineIndex: int, startAt: int) -> None:
         visualLineIndex = len(self.cachedVisualLines)
         self.cachedVisualLines.append(
-            {
-                'text': text,
-                'lineIndex': lineIndex,
-                'startAt': startAt,
-                'prefixWidths': self.buildPrefixWidths(text),
-            }
+            VisualLine(
+                text, lineIndex, startAt, prefixWidths=self.buildPrefixWidths(text)
+            )
         )
 
         if lineIndex in self.visualLineRanges:
@@ -950,17 +955,15 @@ class TextBox(WidgetBase):
 
         for lineIndex in range(startIndex, endIndex):
             visualLine = self.cachedVisualLines[lineIndex]
-
-            if visualLine['lineIndex'] != cursor.line:
+            if visualLine.lineIndex != cursor.line:
                 continue
 
-            lineWidth = visualLine['startAt'] + len(visualLine['text'])
-            if visualLine['startAt'] <= cursor.column <= lineWidth:
+            lineWidth = visualLine.startAt + len(visualLine.text)
+            if visualLine.startAt <= cursor.column <= lineWidth:
                 if (
                     cursor.column == lineWidth != 0
                     and lineIndex + 1 < len(self.cachedVisualLines)
-                    and self.cachedVisualLines[lineIndex + 1]['lineIndex']
-                    == cursor.line
+                    and self.cachedVisualLines[lineIndex + 1].lineIndex == cursor.line
                 ):
                     return lineIndex + 1
                 return lineIndex
@@ -989,7 +992,7 @@ class TextBox(WidgetBase):
         return widths
 
     def getVisualWidth(self, visualLine: dict, column: int) -> int:
-        prefixWidths = visualLine['prefixWidths']
+        prefixWidths = visualLine.prefixWidths
         column = max(0, min(column, len(prefixWidths) - 1))
         return prefixWidths[column]
 
@@ -1051,7 +1054,7 @@ class TextBox(WidgetBase):
 
         if visualLineIndex != -1:
             visualLine = self.cachedVisualLines[visualLineIndex]
-            relativeColumn = self.cursor.column - visualLine['startAt']
+            relativeColumn = self.cursor.column - visualLine.startAt
 
             self.cursor.preferredColumn = relativeColumn
 
@@ -1104,18 +1107,18 @@ class TextBox(WidgetBase):
 
         visualLine = self.cachedVisualLines[visualLineIndex]
 
-        if visualLine['lineIndex'] != self.cursor.line:
-            self.cursor.set(visualLine['lineIndex'], self.cursor.column, self.text)
+        if visualLine.lineIndex != self.cursor.line:
+            self.cursor.set(visualLine.lineIndex, self.cursor.column, self.text)
 
-        if len(visualLine['text']) == 0:
-            self.cursor.set(self.cursor.line, visualLine['startAt'], self.text)
+        if len(visualLine.text) == 0:
+            self.cursor.set(self.cursor.line, visualLine.startAt, self.text)
             return
 
         relativeX = mouseX - self._actualX
-        prefixWidths = visualLine['prefixWidths']
-        relativeColumn = len(visualLine['text'])
+        prefixWidths = visualLine.prefixWidths
+        relativeColumn = len(visualLine.text)
 
-        for column in range(len(visualLine['text'])):
+        for column in range(len(visualLine.text)):
             midpoint = (prefixWidths[column] + prefixWidths[column + 1]) / 2
             if relativeX < midpoint:
                 relativeColumn = column
@@ -1123,7 +1126,7 @@ class TextBox(WidgetBase):
 
         self.cursor.set(
             self.cursor.line,
-            visualLine['startAt'] + relativeColumn,
+            visualLine.startAt + relativeColumn,
             self.text,
         )
 
