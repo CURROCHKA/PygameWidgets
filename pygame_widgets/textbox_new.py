@@ -97,7 +97,9 @@ class TextBox(WidgetBase):
 
         # Font style
         self.fontSize = kwargs.get('fontSize', 20)
-        self.font = kwargs.get('font', pygame.freetype.SysFont('calibri', self.fontSize))
+        self.font = kwargs.get(
+            'font', pygame.freetype.SysFont('calibri', self.fontSize)
+        )
         self.font.pad = True
         self.textcolor = kwargs.get('textcolor', (0, 0, 0))
 
@@ -144,7 +146,7 @@ class TextBox(WidgetBase):
         self._actualHeight = (
             self._height - self.textOffsetTop - self.borderThickness * 2
         )
-        self.lineHeight = self.font.get_sized_height()
+        self.lineHeight = self.fontSize
         self._actualX = self._x + self.textOffsetLeft + self.borderThickness
         self._actualY = self._y + self.textOffsetTop + self.borderThickness
 
@@ -233,17 +235,39 @@ class TextBox(WidgetBase):
                     self.handleTextInput(event)
 
                 elif event.type == pygame.KEYUP:
-                    self.repeatEvent = None
-                    self.keyDown = False
-                    self.firstRepeat = True
+                    if (
+                        self.repeatEvent is not None
+                        and self.repeatEvent.type == pygame.KEYDOWN
+                        and event.key == self.repeatEvent.key
+                    ):
+                        self.repeatEvent = None
+                        self.keyDown = False
+                        self.firstRepeat = True
 
     def handleKeyDown(self, event: pygame.Event) -> None:
         now = pygame.time.get_ticks()
         self.showCursor = True
-        self.keyDown = True
-        self.repeatEvent = event
-        self.repeatTime = now
         self.cursorTime = now
+
+        REPEATABLE = (
+            pygame.K_BACKSPACE,
+            pygame.K_DELETE,
+            pygame.K_UP,
+            pygame.K_DOWN,
+            pygame.K_LEFT,
+            pygame.K_RIGHT,
+            pygame.K_KP_8,
+            pygame.K_KP_2,
+            pygame.K_KP_4,
+            pygame.K_KP_6,
+        )
+        if event.key in REPEATABLE:
+            self.keyDown = True
+            self.repeatEvent = event
+            self.repeatTime = now
+        else:
+            self.keyDown = False
+            self.repeatEvent = None
 
         if event.key == pygame.K_BACKSPACE:
             self.eraseText(event, direction=-1)
@@ -252,51 +276,41 @@ class TextBox(WidgetBase):
             self.eraseText(event, direction=1)
 
         elif event.key == pygame.K_RETURN:
+            if self.readOnly:
+                return
             if event.mod & pygame.KMOD_SHIFT or event.mod & pygame.KMOD_CTRL:
                 if not self.readOnly:
                     self.addText('\n')
             else:
                 self.onSubmit(*self.onSubmitParams)
 
-        elif (
-            event.key == pygame.K_UP
-            or event.key == pygame.K_KP_8
-            and not event.mod & pygame.KMOD_NUM
+        elif event.key == pygame.K_UP or (
+            event.key == pygame.K_KP_8 and not event.mod & pygame.KMOD_NUM
         ):
             self.moveCursorVertical(event, direction=-1)
 
-        elif (
-            event.key == pygame.K_DOWN
-            or event.key == pygame.K_KP_2
-            and not event.mod & pygame.KMOD_NUM
+        elif event.key == pygame.K_DOWN or (
+            event.key == pygame.K_KP_2 and not event.mod & pygame.KMOD_NUM
         ):
             self.moveCursorVertical(event, direction=1)
 
-        elif (
-            event.key == pygame.K_LEFT
-            or event.key == pygame.K_KP_4
-            and not event.mod & pygame.KMOD_NUM
+        elif event.key == pygame.K_LEFT or (
+            event.key == pygame.K_KP_4 and not event.mod & pygame.KMOD_NUM
         ):
             self.moveCursorHorizontal(event, direction=-1)
 
-        elif (
-            event.key == pygame.K_RIGHT
-            or event.key == pygame.K_KP_6
-            and not event.mod & pygame.KMOD_NUM
+        elif event.key == pygame.K_RIGHT or (
+            event.key == pygame.K_KP_6 and not event.mod & pygame.KMOD_NUM
         ):
             self.moveCursorHorizontal(event, direction=1)
 
-        elif (
-            event.key == pygame.K_HOME
-            or event.key == pygame.K_KP_7
-            and not event.mod & pygame.KMOD_NUM
+        elif event.key == pygame.K_HOME or (
+            event.key == pygame.K_KP_7 and not event.mod & pygame.KMOD_NUM
         ):
             self.jumpToEdge(event, direction=-1)
 
-        elif (
-            event.key == pygame.K_END
-            or event.key == pygame.K_KP_1
-            and not event.mod & pygame.KMOD_NUM
+        elif event.key == pygame.K_END or (
+            event.key == pygame.K_KP_1 and not event.mod & pygame.KMOD_NUM
         ):
             self.jumpToEdge(event, direction=1)
 
@@ -329,9 +343,6 @@ class TextBox(WidgetBase):
         if not self.readOnly:
             now = pygame.time.get_ticks()
             self.showCursor = True
-            self.keyDown = True
-            self.repeatEvent = event
-            self.repeatTime = now
             self.cursorTime = now
             if len(event.text) != 0:
                 self.addText(event.text)
@@ -715,17 +726,11 @@ class TextBox(WidgetBase):
             if now - self.repeatTime >= self.REPEAT_DELAY:
                 self.firstRepeat = False
                 self.repeatTime = now
-                if self.repeatEvent.type == pygame.KEYDOWN:
-                    self.handleKeyDown(self.repeatEvent)
-                elif self.repeatEvent.type == pygame.TEXTINPUT:
-                    self.handleTextInput(self.repeatEvent)
+                self.handleKeyDown(self.repeatEvent)
 
         elif now - self.repeatTime >= self.REPEAT_INTERVAL:
             self.repeatTime = now
-            if self.repeatEvent.type == pygame.KEYDOWN:
-                self.handleKeyDown(self.repeatEvent)
-            elif self.repeatEvent.type == pygame.TEXTINPUT:
-                self.handleTextInput(self.repeatEvent)
+            self.handleKeyDown(self.repeatEvent)
 
     def ensureCursorVisible(self) -> None:
         visualLineIndex = self.getVisualLineIndex(self.cursor)
@@ -979,7 +984,7 @@ class TextBox(WidgetBase):
         metrics = self.font.get_metrics(text)
         cumulative = 0
         for glyph in metrics:
-            cumulative += glyph[4]
+            cumulative += glyph[4] if glyph else self.getTextWidth(text)
             widths.append(cumulative)
         return widths
 
@@ -988,7 +993,9 @@ class TextBox(WidgetBase):
         column = max(0, min(column, len(prefixWidths) - 1))
         return prefixWidths[column]
 
-    def getRenderedTextSurface(self, text: str, color: tuple[int, int, int, int] | pygame.Color) -> pygame.Surface:
+    def getRenderedTextSurface(
+        self, text: str, color: tuple[int, int, int, int] | pygame.Color
+    ) -> pygame.Surface:
         cacheKey = (text, color)
 
         if cacheKey in self._renderedTextCache:
@@ -1037,7 +1044,7 @@ class TextBox(WidgetBase):
         self.text = ['']
         self.cursor.set(0, 0, self.text)
         self.resetSelection()
-        self.addText(text)
+        self.addText(text, callOnTextChanged=False)
 
     def setPreferredColumn(self) -> None:
         visualLineIndex = self.getVisualLineIndex(self.cursor)
