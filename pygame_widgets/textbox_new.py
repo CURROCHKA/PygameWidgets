@@ -86,7 +86,7 @@ class TextBox(WidgetBase):
         # Cursor state and style
         self.cursor = Cursor()
         self.cursorWidth = kwargs.get('cursorWidth', 2)
-        self.cursorcolor = kwargs.get('cursorcolor', (0, 0, 0))
+        self.cursorColour = kwargs.get('cursorColour', (0, 0, 0))
         self.cursorAlpha = kwargs.get('cursorAlpha', 63)
         self.showCursor = not self.readOnly
         self.cursorTime = 0
@@ -108,7 +108,7 @@ class TextBox(WidgetBase):
             'font', pygame.freetype.SysFont('calibri', self.fontSize)
         )
         self.font.pad = True
-        self.textcolor = kwargs.get('textcolor', (0, 0, 0))
+        self.textColour = kwargs.get('textColour', (0, 0, 0))
 
         # Margins
         self.textOffsetTop = self.fontSize // 3
@@ -117,17 +117,17 @@ class TextBox(WidgetBase):
 
         # Placeholder
         self.placeholderText = kwargs.get('placeholderText', '')
-        self.placeholderTextcolor = kwargs.get('placeholderTextcolor', (10, 10, 10))
+        self.placeholderTextColour = kwargs.get('placeholderTextColour', (10, 10, 10))
 
         # Widget style
-        self.color = kwargs.get('color', (220, 220, 220))
+        self.colour = kwargs.get('colour', (220, 220, 220))
         self.borderThickness = kwargs.get('borderThickness', 3)
-        self.bordercolor = kwargs.get('bordercolor', (0, 0, 0))
+        self.borderColour = kwargs.get('borderColour', (0, 0, 0))
         self.radius = kwargs.get('radius', 0)
 
         self.selectionStart = Cursor()
         self.selectionEnd = Cursor()
-        self.selectioncolor = kwargs.get('selectioncolor', (166, 210, 255))
+        self.selectionColour = kwargs.get('selectionColour', (166, 210, 255))
 
         # Callback
         self.onSubmit = kwargs.get('onSubmit', lambda *args: None)
@@ -255,26 +255,9 @@ class TextBox(WidgetBase):
         now = pygame.time.get_ticks()
         self.showCursor = True
         self.cursorTime = now
-
-        REPEATABLE = (
-            pygame.K_BACKSPACE,
-            pygame.K_DELETE,
-            pygame.K_UP,
-            pygame.K_DOWN,
-            pygame.K_LEFT,
-            pygame.K_RIGHT,
-            pygame.K_KP_8,
-            pygame.K_KP_2,
-            pygame.K_KP_4,
-            pygame.K_KP_6,
-        )
-        if event.key in REPEATABLE:
-            self.keyDown = True
-            self.repeatEvent = event
-            self.repeatTime = now
-        else:
-            self.keyDown = False
-            self.repeatEvent = None
+        self.keyDown = True
+        self.repeatEvent = event
+        self.repeatTime = now
 
         if event.key == pygame.K_BACKSPACE:
             self.eraseText(event, direction=-1)
@@ -373,10 +356,10 @@ class TextBox(WidgetBase):
                     text=self.placeholderText, lineIndex=0, startAt=0, prefixWidths=[0]
                 )
             ]
-            color = self.placeholderTextcolor
+            colour = self.placeholderTextColour
         else:
             displayLines = self.cachedVisualLines
-            color = self.textcolor
+            colour = self.textColour
 
         for i, visualLine in enumerate(displayLines):
             if not (
@@ -387,7 +370,7 @@ class TextBox(WidgetBase):
                 continue
 
             lineY = self._actualY + (i - self.firstVisibleLineIndex) * self.lineHeight
-            textSurface = self.getRenderedTextSurface(visualLine.text, color)
+            textSurface = self.getRenderedTextSurface(visualLine.text, colour)
             self.win.blit(textSurface, (self._actualX, lineY))
 
     def _drawCursor(self) -> None:
@@ -416,28 +399,28 @@ class TextBox(WidgetBase):
                 if not self.insertOn:
                     pygame.draw.line(
                         self.win,
-                        self.cursorcolor,
+                        self.cursorColour,
                         (startX, startY),
                         (endX, endY),
                         self.cursorWidth,
                     )
                 else:
                     if self.cursor.column == len(self.text[self.cursor.line]):
-                        textSurface = self.getRenderedTextSurface(' ', self.textcolor)
+                        textSurface = self.getRenderedTextSurface(' ', self.textColour)
                     else:
                         textSurface = self.getRenderedTextSurface(
                             self.text[self.cursor.line][self.cursor.column],
-                            self.textcolor,
+                            self.textColour,
                         )
                     cursorSurface = pygame.Surface(textSurface.get_size())
-                    cursorSurface.fill(self.cursorcolor)
+                    cursorSurface.fill(self.cursorColour)
                     cursorSurface.set_alpha(self.cursorAlpha)
                     self.win.blit(cursorSurface, (startX, startY))
 
     def _drawBorder(self) -> None:
         pygame.draw.rect(
             self.win,
-            self.bordercolor,
+            self.borderColour,
             (self._x, self._y, self._width, self._height),
             border_radius=self.radius,
         )
@@ -449,7 +432,7 @@ class TextBox(WidgetBase):
             self._width - self.borderThickness * 2,
             self._height - self.borderThickness * 2,
         )
-        pygame.draw.rect(self.win, self.color, rect, border_radius=self.radius)
+        pygame.draw.rect(self.win, self.colour, rect, border_radius=self.radius)
 
     def _drawSelection(self) -> None:
         if self.isEmptySelection():
@@ -507,7 +490,7 @@ class TextBox(WidgetBase):
 
             pygame.draw.rect(
                 self.win,
-                self.selectioncolor,
+                self.selectionColour,
                 (self._actualX + textBeforeWidth, lineY, textWidth, self.lineHeight),
             )
 
@@ -986,8 +969,11 @@ class TextBox(WidgetBase):
         widths = [0]
         metrics = self.font.get_metrics(text)
         cumulative = 0
-        for glyph in metrics:
-            cumulative += glyph[4] if glyph else self.getTextWidth(text)
+        for i, glyph in enumerate(metrics):
+            if glyph:
+                cumulative += glyph[4]
+            else:
+                cumulative += self.getTextWidth(text[i])
             widths.append(cumulative)
         return widths
 
@@ -997,9 +983,9 @@ class TextBox(WidgetBase):
         return prefixWidths[column]
 
     def getRenderedTextSurface(
-        self, text: str, color: tuple[int, int, int, int] | pygame.Color
+        self, text: str, colour: tuple[int, int, int, int] | pygame.Color
     ) -> pygame.Surface:
-        cacheKey = (text, color)
+        cacheKey = (text, colour)
 
         if cacheKey in self._renderedTextCache:
             self._renderedTextCache.move_to_end(cacheKey)
@@ -1008,7 +994,7 @@ class TextBox(WidgetBase):
         if len(self._renderedTextCache) >= self.RENDER_CACHE_SIZE:
             self._renderedTextCache.popitem(last=False)
 
-        rendered = self.font.render(text, fgcolor=color)[0]
+        rendered = self.font.render(text, fgcolor=colour)[0]
         self._renderedTextCache[cacheKey] = rendered
         return rendered
 
@@ -1170,8 +1156,8 @@ if __name__ == '__main__':
         100,
         maxHeight=450,
         fontSize=50,
-        bordercolor=(255, 0, 0),
-        textcolor=(0, 200, 0),
+        borderColour=(255, 0, 0),
+        textColour=(0, 200, 0),
         onSubmit=output,
         radius=10,
         borderThickness=5,
