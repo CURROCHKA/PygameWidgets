@@ -3,9 +3,13 @@ import sys
 
 import pygame
 import pygame.freetype
-import pygame_widgets
+
+# import pygame_widgets
+import __init__ as pygame_widgets
 from pygame_widgets.widget import WidgetBase
-from pygame_widgets.mouse import Mouse, MouseState
+
+# from pygame_widgets.mouse import Mouse, MouseState
+from mouse import Mouse, MouseState
 
 from bisect import bisect_right
 from dataclasses import dataclass, field, replace
@@ -125,7 +129,6 @@ class TextBox(WidgetBase):
         self.showCursor = not self.style.readOnly
         self.cursorTime = 0
         self.lastClickTime = 0
-        self.isDoubleClick = False
 
         self.repeatDelay = repeatDelay
         self.repeatInterval = repeatInterval
@@ -197,66 +200,10 @@ class TextBox(WidgetBase):
         if self.keyDown:
             self.updateRepeatEvent()
 
-        # Selection
-        mouseState = Mouse.getMouseState()
-        x, y = Mouse.getMousePos()
+        self.handleMouse()
 
-        if mouseState == MouseState.CLICK:
-            if self.contains(x, y):
-                now = pygame.time.get_ticks()
-
-                self.isDoubleClick = (
-                    now - self.lastClickTime
-                ) < self.doubleClickInterval
-                self.lastClickTime = now
-
-                self.selected = True
-                self.showCursor = True
-                self.cursorTime = now
-
-                self.setCursorFromMouse(x, y)
-                if self.isDoubleClick:
-                    self.moveCursorWord(direction=-1)
-                    self.selectionStart.set(
-                        self.cursor.line, self.cursor.column, self.text
-                    )
-                    self.moveCursorWord(direction=1)
-                    self.selectionEnd.set(
-                        self.cursor.line, self.cursor.column, self.text
-                    )
-                else:
-                    self.resetSelection()
-                self.setPreferredColumn()
-
-            else:
-                self.escape()
-
-        elif mouseState == MouseState.DRAG and self.selected and not self.isDoubleClick:
-            self.cursorTime = pygame.time.get_ticks()
-            self.setCursorFromMouse(x, y)
-            self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
-            self.setPreferredColumn()
-
-            if y < self._actualY:
-                self.firstVisibleLineIndex = max(0, self.firstVisibleLineIndex - 1)
-            elif y > self._actualY + self._actualHeight:
-                maxScroll = max(0, len(self.cachedVisualLines) - self.maxVisibleLines)
-                self.firstVisibleLineIndex = min(
-                    maxScroll, self.firstVisibleLineIndex + 1
-                )
-
-        # Keyboard Input
         if self.selected:
             for event in events:
-                if event.type == pygame.MOUSEWHEEL and self.contains(x, y):
-                    self.firstVisibleLineIndex -= event.y * self.style.linesPerScroll
-                    maxScroll = max(
-                        0, len(self.cachedVisualLines) - self.maxVisibleLines
-                    )
-                    self.firstVisibleLineIndex = max(
-                        0, min(self.firstVisibleLineIndex, maxScroll)
-                    )
-
                 if event.type == pygame.KEYDOWN:
                     self.handleKeyDown(event)
 
@@ -272,6 +219,26 @@ class TextBox(WidgetBase):
                         self.repeatEvent = None
                         self.keyDown = False
                         self.firstRepeat = True
+
+    def handleMouse(self) -> None:
+        mouseState = Mouse.getMouseState()
+        x, y = Mouse.getMousePos()
+
+        if mouseState == MouseState.CLICK:
+            self.processMouseClick(x, y)
+
+        if self.selected:
+            if mouseState == MouseState.DRAG:
+                self.processMouseDrag(x, y)
+
+            elif mouseState == MouseState.DOUBLE_CLICK:
+                self.processMouseDoubleClick()
+
+            elif mouseState == MouseState.TRIPLE_CLICK:
+                self.processMouseTripleClick()
+
+        if mouseState == MouseState.WHEEL_MOTION and self.contains(x, y):
+            self.processMouseScroll()
 
     def handleKeyDown(self, event: pygame.Event) -> None:
         if event.mod & pygame.KMOD_ALT:
@@ -291,12 +258,7 @@ class TextBox(WidgetBase):
             self.eraseText(event, direction=1)
 
         elif event.key == pygame.K_RETURN:
-            if self.style.readOnly:
-                return
-            if event.mod & pygame.KMOD_SHIFT or event.mod & pygame.KMOD_CTRL:
-                self.addText('\n')
-            else:
-                self.onSubmit(*self.onSubmitParams)
+            self.processReturn()
 
         elif event.key == pygame.K_UP or (
             event.key == pygame.K_KP_8 and not event.mod & pygame.KMOD_NUM
@@ -329,28 +291,21 @@ class TextBox(WidgetBase):
             self.jumpToEdge(event, direction=1)
 
         elif event.key == pygame.K_a and event.mod & pygame.KMOD_CTRL:
-            self.selectionStart.set(0, 0, self.text)
-            self.selectionEnd.set(len(self.text) - 1, len(self.text[-1]), self.text)
-            self.cursor.set(len(self.text) - 1, len(self.text[-1]), self.text)
+            self.selectAll()
 
         elif event.key == pygame.K_c and event.mod & pygame.KMOD_CTRL:
-            self.copySelectedText()
+            self.copy()
 
         elif event.key == pygame.K_v and event.mod & pygame.KMOD_CTRL:
-            if not self.style.readOnly:
-                text = pyperclip.paste()
-                if text:
-                    self.addText(text)
+            self.paste()
 
         elif event.key == pygame.K_x and event.mod & pygame.KMOD_CTRL:
-            self.copySelectedText()
-            if not self.style.readOnly and not self.isEmptySelection():
-                self.eraseSelectedText()
+            self.cut()
 
         elif event.key == pygame.K_INSERT or (
             event.key == pygame.K_KP_0 and not event.mod & pygame.KMOD_NUM
         ):
-            self.insertOn = not self.insertOn
+            self.processInsert(self)
 
         elif event.key == pygame.K_ESCAPE:
             self.escape()
@@ -524,6 +479,58 @@ class TextBox(WidgetBase):
                 self.style.selectionColour,
                 (self._actualX + textBeforeWidth, lineY, textWidth, self.lineHeight),
             )
+
+    def processMouseClick(self, x: int, y: int) -> None:
+        if self.contains(x, y):
+            now = pygame.time.get_ticks()
+            self.lastClickTime = now
+
+            self.selected = True
+            self.showCursor = True
+            self.cursorTime = now
+
+            self.setCursorFromMouse(x, y)
+            self.resetSelection()
+            self.setPreferredColumn()
+        else:
+            self.escape()
+
+    def processMouseDrag(self, x: int, y: int) -> None:
+        self.cursorTime = pygame.time.get_ticks()
+        self.setCursorFromMouse(x, y)
+        self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
+        self.setPreferredColumn()
+
+        if y < self._actualY:
+            self.firstVisibleLineIndex = max(0, self.firstVisibleLineIndex - 1)
+        elif y > self._actualY + self._actualHeight:
+            maxScroll = max(0, len(self.cachedVisualLines) - self.maxVisibleLines)
+            self.firstVisibleLineIndex = min(maxScroll, self.firstVisibleLineIndex + 1)
+
+    def processMouseDoubleClick(self) -> None:
+        self.moveCursorWord(direction=-1)
+        self.selectionStart.set(self.cursor.line, self.cursor.column, self.text)
+        self.moveCursorWord(direction=1)
+        self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
+
+    def processMouseTripleClick(self) -> None:
+        self.selectionStart.set(self.cursor.line, 0, self.text)
+        self.selectionEnd.set(
+            self.cursor.line, len(self.text[self.cursor.line]), self.text
+        )
+
+    def processMouseScroll(self) -> None:
+        self.firstVisibleLineIndex -= Mouse.getWheelDelta() * self.style.linesPerScroll
+        maxScroll = max(0, len(self.cachedVisualLines) - self.maxVisibleLines)
+        self.firstVisibleLineIndex = max(0, min(self.firstVisibleLineIndex, maxScroll))
+
+    def processReturn(self, event: list[pygame.Event]) -> None:
+        if self.style.readOnly:
+            return
+        if event.mod & pygame.KMOD_SHIFT or event.mod & pygame.KMOD_CTRL:
+            self.addText('\n')
+        else:
+            self.onSubmit(*self.onSubmitParams)
 
     def processBackspace(self) -> None:
         if self.cursor.column > 0:
@@ -737,6 +744,29 @@ class TextBox(WidgetBase):
 
         self.setPreferredColumn()
         self.ensureCursorVisible()
+
+    def selectAll(self) -> None:
+        self.selectionStart.set(0, 0, self.text)
+        self.selectionEnd.set(len(self.text) - 1, len(self.text[-1]), self.text)
+        self.cursor.set(len(self.text) - 1, len(self.text[-1]), self.text)
+
+    def copy(self) -> None:
+        if not self.isEmptySelection():
+            pyperclip.copy(self.getSelectedText())
+
+    def paste(self) -> None:
+        if not self.style.readOnly:
+            text = pyperclip.paste()
+            if text:
+                self.addText(text)
+
+    def cut(self) -> None:
+        self.copy()
+        if not self.style.readOnly and not self.isEmptySelection():
+            self.eraseSelectedText()
+
+    def processInsert(self) -> None:
+        self.insertOn = not self.insertOn
 
     def updateRepeatEvent(self) -> None:
         if self.repeatEvent is None:
@@ -1035,10 +1065,6 @@ class TextBox(WidgetBase):
     def isEmptyText(self, text: list[str]) -> bool:
         return len(text) == 1 and text[0] == ''
 
-    def copySelectedText(self) -> None:
-        if not self.isEmptySelection():
-            pyperclip.copy(self.getSelectedText())
-
     def isWordChar(self, character: str) -> bool:
         return character.isalnum() or character == '_'
 
@@ -1054,7 +1080,6 @@ class TextBox(WidgetBase):
         self.firstRepeat = True
         self.selected = False
         self.showCursor = False
-        self.isDoubleClick = False
         self.resetSelection()
 
     def setText(self, text: str) -> None:
