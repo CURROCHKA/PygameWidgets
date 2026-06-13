@@ -8,7 +8,7 @@ from pygame_widgets.widget import WidgetBase
 from pygame_widgets.mouse import Mouse, MouseState
 
 from bisect import bisect_right
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from collections import OrderedDict
 
 from typing import Literal, NamedTuple
@@ -49,7 +49,7 @@ class TextBoxStyle:
     radius: int = 0
 
     fontSize: int = 20
-    font: pygame.freetype.Font = None
+    font: pygame.freetype.Font | None = None
     textColour: tuple[int, int, int] = (0, 0, 0)
 
     cursorWidth: int = 2
@@ -82,7 +82,8 @@ class TextBox(WidgetBase):
         x: int,
         y: int,
         width: int,
-        minHeight: int,
+        height: int,
+        minHeight: int = None,
         maxHeight: int = None,
         onSubmit: callable = _emptyCallback,
         onSubmitParams: tuple = (),
@@ -92,38 +93,20 @@ class TextBox(WidgetBase):
         isSubWidget=False,
         **kwargs,
     ) -> None:
-        '''A customisable textbox for Pygame
+        super().__init__(win, x, y, width, height, isSubWidget)
 
-        :param win: Surface on which to draw
-        :type win: pygame.Surface
-        :param x: X-coordinate of top left
-        :type x: int
-        :param y: Y-coordinate of top left
-        :type y: int
-        :param width: Width of button
-        :type width: int
-        :param minHeight: Minimum height of textbox
-        :type minHeight: int
-        :param maxHeight: Maximum height of textbox. Defaults to minHeight for fixed-height behavior
-        :type maxHeight: int
-        :param kwargs: Optional parameters
-        '''
-        super().__init__(win, x, y, width, minHeight, isSubWidget)
-
-        if style is not None:
-            self.style = style
+        styleKwargs = {
+            k: v for k, v in kwargs.items() if k in TextBoxStyle.__dataclass_fields__
+        }
+        if style is None:
+            self.style = TextBoxStyle(**styleKwargs)
         else:
-            style_kwargs = {
-                k: v
-                for k, v in kwargs.items()
-                if k in TextBoxStyle.__dataclass_fields__
-            }
-            self.style = TextBoxStyle(**style_kwargs)
+            self.style = replace(style, **styleKwargs)
 
-        # Инициализируем шрифт, если он не был передан (безопасно для pygame)
-        if self.style.font is None:
-            self.style.font = pygame.freetype.SysFont('calibri', self.style.fontSize)
-        self.style.font.pad = True
+        self.font = self.style.font or pygame.freetype.SysFont(
+            'calibri', self.style.fontSize
+        )
+        self.font.pad = True
 
         # Widget state
         self.selected = False
@@ -161,12 +144,23 @@ class TextBox(WidgetBase):
         self.onTextChangedParams = onTextChangedParams
 
         # Layout
+        self._height = height
         self._minHeight = minHeight
         self._maxHeight = maxHeight
+        self.firstVisibleLineIndex = 0
+        self.reconfigureLayout()
+
+        self._widthCache = OrderedDict()
+        self._renderedTextCache = OrderedDict()
+
+    def reconfigureLayout(self) -> None:
+        if self._minHeight is None:
+            self._minHeight = self._height
+
         if self._maxHeight is None:
-            self._maxHeight = self._minHeight
+            self._maxHeight = self._height
         else:
-            self._maxHeight = max(self._minHeight, self._maxHeight)
+            self._maxHeight = max(self._height, self._maxHeight)
 
         self._actualWidth = (
             self._width
@@ -181,18 +175,9 @@ class TextBox(WidgetBase):
         self._actualX = self._x + self.textOffsetLeft + self.style.borderThickness
         self._actualY = self._y + self.textOffsetTop + self.style.borderThickness
 
-        self.firstVisibleLineIndex = 0
         self.maxVisibleLines = max(1, self._actualHeight // self.lineHeight)
 
-        self._widthCache = OrderedDict()
-        self._renderedTextCache = OrderedDict()
-
     def listen(self, events) -> None:
-        '''Wait for inputs
-
-        :param events: Use pygame.event.get()
-        :type events: list of pygame.event.Event
-        '''
         if self._hidden or self._disabled:
             return
 
@@ -278,7 +263,7 @@ class TextBox(WidgetBase):
     def handleKeyDown(self, event: pygame.Event) -> None:
         if event.mod & pygame.KMOD_ALT:
             return
-        
+
         now = pygame.time.get_ticks()
         self.showCursor = True
         self.cursorTime = now
@@ -296,8 +281,7 @@ class TextBox(WidgetBase):
             if self.style.readOnly:
                 return
             if event.mod & pygame.KMOD_SHIFT or event.mod & pygame.KMOD_CTRL:
-                if not self.style.readOnly:
-                    self.addText('\n')
+                self.addText('\n')
             else:
                 self.onSubmit(*self.onSubmitParams)
 
@@ -350,7 +334,9 @@ class TextBox(WidgetBase):
             if not self.style.readOnly and not self.isEmptySelection():
                 self.eraseSelectedText()
 
-        elif event.key in (pygame.K_INSERT, pygame.K_KP_0):
+        elif event.key == pygame.K_INSERT or (
+            event.key == pygame.K_KP_0 and not event.mod & pygame.KMOD_NUM
+        ):
             self.insertOn = not self.insertOn
 
         elif event.key == pygame.K_ESCAPE:
@@ -380,7 +366,10 @@ class TextBox(WidgetBase):
         if self.isEmptyText(self.text):
             displayLines = [
                 VisualLine(
-                    text=self.style.placeholderText, lineIndex=0, startAt=0, prefixWidths=[0]
+                    text=self.style.placeholderText,
+                    lineIndex=0,
+                    startAt=0,
+                    prefixWidths=[0],
                 )
             ]
             colour = self.style.placeholderTextColour
@@ -433,7 +422,9 @@ class TextBox(WidgetBase):
                     )
                 else:
                     if self.cursor.column == len(self.text[self.cursor.line]):
-                        textSurface = self.getRenderedTextSurface(' ', self.style.textColour)
+                        textSurface = self.getRenderedTextSurface(
+                            ' ', self.style.textColour
+                        )
                     else:
                         textSurface = self.getRenderedTextSurface(
                             self.text[self.cursor.line][self.cursor.column],
@@ -459,13 +450,15 @@ class TextBox(WidgetBase):
             self._width - self.style.borderThickness * 2,
             self._height - self.style.borderThickness * 2,
         )
-        pygame.draw.rect(self.win, self.style.colour, rect, border_radius=self.style.radius)
+        pygame.draw.rect(
+            self.win, self.style.colour, rect, border_radius=self.style.radius
+        )
 
     def _drawSelection(self) -> None:
         if self.isEmptySelection():
             return
 
-        start, end = self.getNormalizeSelection()
+        start, end = self.getNormalizedSelection()
 
         for i, visualLine in enumerate(self.cachedVisualLines):
             if not (
@@ -591,7 +584,7 @@ class TextBox(WidgetBase):
         self.ensureCursorVisible()
 
     def eraseSelectedText(self, callOnTextChanged: bool = True) -> None:
-        start, end = self.getNormalizeSelection()
+        start, end = self.getNormalizedSelection()
         reflowStartLine = start.line
         reflowStartColumn = start.column
 
@@ -654,7 +647,7 @@ class TextBox(WidgetBase):
 
         baseCursor = Cursor(self.cursor.line, self.cursor.column)
         if not shiftPressed and not self.isEmptySelection():
-            start, end = self.getNormalizeSelection()
+            start, end = self.getNormalizedSelection()
             baseCursor = start if direction == -1 else end
             self.cursor.set(baseCursor.line, baseCursor.column, self.text)
             self.resetSelection()
@@ -696,7 +689,7 @@ class TextBox(WidgetBase):
         ctrlPressed = bool(event.mod & pygame.KMOD_CTRL)
 
         if not shiftPressed and not self.isEmptySelection():
-            start, end = self.getNormalizeSelection()
+            start, end = self.getNormalizedSelection()
             boundary = start if direction == -1 else end
             self.cursor.set(boundary.line, boundary.column, self.text)
             self.resetSelection()
@@ -807,12 +800,9 @@ class TextBox(WidgetBase):
 
         else:
             for i, line in enumerate(lines):
-                if len(line) > len(self.text[self.cursor.line]):
-                    rightPart = ''
-                else:
-                    rightPart = self.text[self.cursor.line][
-                        self.cursor.column + len(line) :
-                    ]
+                rightPart = self.text[self.cursor.line][
+                    self.cursor.column + len(line) :
+                ]
 
                 self.text[self.cursor.line] = (
                     self.text[self.cursor.line][: self.cursor.column] + line
@@ -833,7 +823,7 @@ class TextBox(WidgetBase):
         if callOnTextChanged:
             self.onTextChanged(*self.onTextChangedParams)
 
-    def getNormalizeSelection(self) -> tuple[Cursor, Cursor]:
+    def getNormalizedSelection(self) -> tuple[Cursor, Cursor]:
         if self.selectionStart > self.selectionEnd:
             return self.selectionEnd, self.selectionStart
         return self.selectionStart, self.selectionEnd
@@ -987,14 +977,14 @@ class TextBox(WidgetBase):
         if len(self._widthCache) >= self.WIDTH_CACHE_SIZE:
             self._widthCache.popitem(last=False)
 
-        width = self.style.font.get_rect(text).width
+        width = self.font.get_rect(text).width
         self._widthCache[text] = width
 
         return width
 
     def buildPrefixWidths(self, text: str) -> list[int]:
         widths = [0]
-        metrics = self.style.font.get_metrics(text)
+        metrics = self.font.get_metrics(text)
         cumulative = 0
         for i, glyph in enumerate(metrics):
             if glyph:
@@ -1004,7 +994,7 @@ class TextBox(WidgetBase):
             widths.append(cumulative)
         return widths
 
-    def getVisualWidth(self, visualLine: dict, column: int) -> int:
+    def getVisualWidth(self, visualLine: VisualLine, column: int) -> int:
         prefixWidths = visualLine.prefixWidths
         column = max(0, min(column, len(prefixWidths) - 1))
         return prefixWidths[column]
@@ -1021,7 +1011,7 @@ class TextBox(WidgetBase):
         if len(self._renderedTextCache) >= self.RENDER_CACHE_SIZE:
             self._renderedTextCache.popitem(last=False)
 
-        rendered = self.style.font.render(text, fgcolor=colour)[0]
+        rendered = self.font.render(text, fgcolor=colour)[0]
         self._renderedTextCache[cacheKey] = rendered
         return rendered
 
@@ -1051,9 +1041,9 @@ class TextBox(WidgetBase):
         self.repeatEvent = None
         self.keyDown = False
         self.firstRepeat = True
-
         self.selected = False
         self.showCursor = False
+        self.isDoubleClick = False
         self.resetSelection()
 
     def setText(self, text: str) -> None:
@@ -1147,7 +1137,7 @@ class TextBox(WidgetBase):
         return '\n'.join(self.text)
 
     def getSelectedText(self) -> str:
-        start, end = self.getNormalizeSelection()
+        start, end = self.getNormalizedSelection()
 
         if start.line == end.line:
             return self.text[start.line][start.column : end.column]
@@ -1163,6 +1153,26 @@ class TextBox(WidgetBase):
 
         return '\n'.join(result)
 
+    def set(self, attr: str, value: int) -> None:
+        super().set(attr, value)
+        self.reconfigureLayout()
+
+    def setX(self, x: int) -> None:
+        super().setX(x)
+        self.reconfigureLayout()
+
+    def setY(self, y: int) -> None:
+        super().setY(y)
+        self.reconfigureLayout()
+
+    def setWidth(self, width: int) -> None:
+        super().setWidth(width)
+        self.reconfigureLayout()
+
+    def setHeight(self, height: int) -> None:
+        super().setHeight(height)
+        self.reconfigureLayout()
+
 
 if __name__ == '__main__':
 
@@ -1175,18 +1185,19 @@ if __name__ == '__main__':
 
     clock = pygame.time.Clock()
 
-    modernDarkTheme = TextBoxStyle(colour=(30, 30, 30), textColour=(240, 240, 240), fontSize=24)
+    # modernDarkTheme = TextBoxStyle(
+    #     colour=(30, 30, 30), textColour=(240, 240, 240), fontSize=24
+    # )
 
-    # Привязываем её к куче текстовых полей
     # inputLogin = TextBox(win, 100, 100, 400, 50, style=modernDarkTheme)
     # inputPassword = TextBox(win, 100, 200, 400, 50, style=modernDarkTheme)
 
     textbox = TextBox(
         win,
-        100,
-        100,
-        800,
-        100,
+        x=100,
+        y=100,
+        width=800,
+        height=100,
         maxHeight=450,
         fontSize=50,
         borderColour=(255, 0, 0),
@@ -1205,10 +1216,10 @@ if __name__ == '__main__':
                 pygame.quit()
                 run = False
                 sys.exit()
-            elif outerEvent.type == pygame.KEYDOWN:
-                if outerEvent.key == pygame.K_k:
-                    modernDarkTheme.colour = (255, 255, 255) 
-                    modernDarkTheme.textColour = (0, 0, 0) 
+            # elif outerEvent.type == pygame.KEYDOWN:
+            #     if outerEvent.key == pygame.K_k:
+            #         modernDarkTheme.colour = (255, 255, 255)
+            #         modernDarkTheme.textColour = (0, 0, 0)
 
         win.fill((255, 255, 255))
 
