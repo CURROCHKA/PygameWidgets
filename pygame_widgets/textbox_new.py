@@ -58,7 +58,6 @@ class TextBoxStyle:
 
     selectionColour: tuple[int, int, int] = (166, 210, 255)
 
-    placeholderText: str = ''
     placeholderTextColour: tuple[int, int, int] = (10, 10, 10)
 
     readOnly: bool = False
@@ -85,6 +84,11 @@ class TextBox(WidgetBase):
         height: int,
         minHeight: int = None,
         maxHeight: int = None,
+        placeholderText: str = '',
+        repeatDelay: float = REPEAT_DELAY,
+        repeatInterval: float = REPEAT_INTERVAL,
+        cursorInterval: float = CURSOR_INTERVAL,
+        doubleClickInterval: float = DOUBLE_CLICK_INTERVAL,
         onSubmit: callable = _emptyCallback,
         onSubmitParams: tuple = (),
         onTextChanged: callable = _emptyCallback,
@@ -94,6 +98,9 @@ class TextBox(WidgetBase):
         **kwargs,
     ) -> None:
         super().__init__(win, x, y, width, height, isSubWidget)
+
+        if not pygame.get_init():
+            pygame.init()
 
         styleKwargs = {
             k: v for k, v in kwargs.items() if k in TextBoxStyle.__dataclass_fields__
@@ -120,6 +127,11 @@ class TextBox(WidgetBase):
         self.lastClickTime = 0
         self.isDoubleClick = False
 
+        self.repeatDelay = repeatDelay
+        self.repeatInterval = repeatInterval
+        self.cursorInterval = cursorInterval
+        self.doubleClickInterval = doubleClickInterval
+
         # Cursor state and style
         self.cursor = Cursor()
         self.selectionStart = Cursor()
@@ -127,6 +139,7 @@ class TextBox(WidgetBase):
 
         # Text state
         self.text = ['']
+        self.placeholderText = placeholderText
         self.cachedVisualLines: list[VisualLine] = [
             VisualLine(text='', lineIndex=0, startAt=0, prefixWidths=[0])
         ]
@@ -194,7 +207,7 @@ class TextBox(WidgetBase):
 
                 self.isDoubleClick = (
                     now - self.lastClickTime
-                ) < self.DOUBLE_CLICK_INTERVAL
+                ) < self.doubleClickInterval
                 self.lastClickTime = now
 
                 self.selected = True
@@ -351,7 +364,6 @@ class TextBox(WidgetBase):
                 self.addText(event.text)
 
     def draw(self) -> None:
-        '''Display to surface'''
         if self._hidden:
             return
         if self.selected:
@@ -366,7 +378,7 @@ class TextBox(WidgetBase):
         if self.isEmptyText(self.text):
             displayLines = [
                 VisualLine(
-                    text=self.style.placeholderText,
+                    text=self.placeholderText,
                     lineIndex=0,
                     startAt=0,
                     prefixWidths=[0],
@@ -377,13 +389,11 @@ class TextBox(WidgetBase):
             displayLines = self.cachedVisualLines
             colour = self.style.textColour
 
-        for i, visualLine in enumerate(displayLines):
-            if not (
-                self.firstVisibleLineIndex
-                <= i
-                < self.firstVisibleLineIndex + self.maxVisibleLines
-            ):
-                continue
+        for i in range(
+            self.firstVisibleLineIndex,
+            min(self.firstVisibleLineIndex + self.maxVisibleLines, len(displayLines)),
+        ):
+            visualLine = displayLines[i]
 
             lineY = self._actualY + (i - self.firstVisibleLineIndex) * self.lineHeight
             textSurface = self.getRenderedTextSurface(visualLine.text, colour)
@@ -460,13 +470,14 @@ class TextBox(WidgetBase):
 
         start, end = self.getNormalizedSelection()
 
-        for i, visualLine in enumerate(self.cachedVisualLines):
-            if not (
-                self.firstVisibleLineIndex
-                <= i
-                < self.firstVisibleLineIndex + self.maxVisibleLines
-            ):
-                continue
+        for i in range(
+            self.firstVisibleLineIndex,
+            min(
+                self.firstVisibleLineIndex + self.maxVisibleLines,
+                len(self.cachedVisualLines),
+            ),
+        ):
+            visualLine = self.cachedVisualLines[i]
 
             lineIndex = visualLine.lineIndex
 
@@ -734,12 +745,12 @@ class TextBox(WidgetBase):
         now = pygame.time.get_ticks()
 
         if self.firstRepeat:
-            if now - self.repeatTime >= self.REPEAT_DELAY:
+            if now - self.repeatTime >= self.repeatDelay:
                 self.firstRepeat = False
                 self.repeatTime = now
                 self.handleKeyDown(self.repeatEvent)
 
-        elif now - self.repeatTime >= self.REPEAT_INTERVAL:
+        elif now - self.repeatTime >= self.repeatInterval:
             self.repeatTime = now
             self.handleKeyDown(self.repeatEvent)
 
@@ -1017,7 +1028,7 @@ class TextBox(WidgetBase):
 
     def updateCursor(self) -> None:
         now = pygame.time.get_ticks()
-        if now - self.cursorTime >= self.CURSOR_INTERVAL:
+        if now - self.cursorTime >= self.cursorInterval:
             self.showCursor = not self.showCursor
             self.cursorTime = now
 
