@@ -534,15 +534,13 @@ class TextBox(WidgetBase):
 
     def processBackspace(self) -> None:
         if self.cursor.column > 0:
-            reflowStartColumn = self.cursor.column - 1
-
             self.text[self.cursor.line] = (
                 self.text[self.cursor.line][: self.cursor.column - 1]
                 + self.text[self.cursor.line][self.cursor.column :]
             )
             self.cursor.set(self.cursor.line, self.cursor.column - 1, self.text)
 
-            self.setVisualLines(self.cursor.line, reflowStartColumn)
+            self.setVisualLines()
             self.setPreferredColumn()
             self.onTextChanged(*self.onTextChangedParams)
 
@@ -552,29 +550,26 @@ class TextBox(WidgetBase):
             self.text.pop(self.cursor.line)
             self.cursor.set(self.cursor.line - 1, previousLineLength, self.text)
 
-            self.setVisualLines(self.cursor.line, previousLineLength)
+            self.setVisualLines()
             self.setPreferredColumn()
             self.onTextChanged(*self.onTextChangedParams)
 
     def processDelete(self) -> None:
         if self.cursor.column < len(self.text[self.cursor.line]):
-            reflowStartColumn = self.cursor.column
-
             self.text[self.cursor.line] = (
                 self.text[self.cursor.line][: self.cursor.column]
                 + self.text[self.cursor.line][self.cursor.column + 1 :]
             )
 
-            self.setVisualLines(self.cursor.line, reflowStartColumn)
+            self.setVisualLines()
             self.setPreferredColumn()
             self.onTextChanged(*self.onTextChangedParams)
 
         elif self.cursor.line < len(self.text) - 1:
-            reflowStartColumn = len(self.text[self.cursor.line])
             self.text[self.cursor.line] += self.text[self.cursor.line + 1]
             self.text.pop(self.cursor.line + 1)
 
-            self.setVisualLines(self.cursor.line, reflowStartColumn)
+            self.setVisualLines()
             self.setPreferredColumn()
             self.onTextChanged(*self.onTextChangedParams)
 
@@ -603,8 +598,6 @@ class TextBox(WidgetBase):
 
     def eraseSelectedText(self, callOnTextChanged: bool = True) -> None:
         start, end = self.getNormalizedSelection()
-        reflowStartLine = start.line
-        reflowStartColumn = start.column
 
         if start.line == end.line:
             self.text[start.line] = (
@@ -621,7 +614,7 @@ class TextBox(WidgetBase):
         self.cursor.set(start.line, start.column, self.text)
         self.resetSelection()
 
-        self.setVisualLines(reflowStartLine, reflowStartColumn)
+        self.setVisualLines()
         self.setPreferredColumn()
         self.ensureCursorVisible()
         if callOnTextChanged:
@@ -768,7 +761,7 @@ class TextBox(WidgetBase):
     def processInsert(self) -> None:
         self.insertOn = not self.insertOn
 
-    def updateRepeatEvent(self) -> None:
+    def updateRepeatEvent(self) -> None:    
         if self.repeatEvent is None:
             return
 
@@ -819,8 +812,6 @@ class TextBox(WidgetBase):
 
         text = str(text).replace('\t', ' ' * self.style.tabSpaces).replace('\r', '')
         lines = text.split('\n')
-        reflowStartLine = self.cursor.line
-        reflowStartColumn = self.cursor.column
 
         if not self.insertOn:
             rightPart = self.text[self.cursor.line][self.cursor.column :]
@@ -858,7 +849,7 @@ class TextBox(WidgetBase):
 
                 self.text[self.cursor.line] += rightPart
 
-        self.setVisualLines(reflowStartLine, reflowStartColumn)
+        self.setVisualLines()
         self.setPreferredColumn()
         self.ensureCursorVisible()
         if callOnTextChanged:
@@ -869,110 +860,65 @@ class TextBox(WidgetBase):
             return self.selectionEnd, self.selectionStart
         return self.selectionStart, self.selectionEnd
 
-    def setVisualLines(self, startLine: int = 0, startColumn: int = 0) -> None:
-        startLine = max(0, min(startLine, len(self.text) - 1))
-        startColumn = max(0, startColumn)
+    def setVisualLines(self) -> None:
+        self.cachedVisualLines = []
+        self.visualLineRanges = {}
 
-        if (startLine, startColumn) == (0, 0) or not self.cachedVisualLines:
-            self.cachedVisualLines = []
-            self.visualLineRanges = {}
-            lineStartColumn = 0
-        else:
-            oldLineStart = self.visualLineRanges.get(
-                startLine, (len(self.cachedVisualLines), len(self.cachedVisualLines))
-            )[0]
-            firstChangedVisualLine, lineStartColumn = self._getReflowStart(
-                startLine, startColumn
-            )
-            self.cachedVisualLines = self.cachedVisualLines[:firstChangedVisualLine]
-            self.visualLineRanges = {
-                lineIndex: visualRange
-                for lineIndex, visualRange in self.visualLineRanges.items()
-                if lineIndex < startLine
-            }
-            if firstChangedVisualLine > oldLineStart:
-                self.visualLineRanges[startLine] = (
-                    oldLineStart,
-                    firstChangedVisualLine,
-                )
+        for lineIndex, line in enumerate(self.text):
+            rangeStart = len(self.cachedVisualLines)
 
-        for lineIndex in range(startLine, len(self.text)):
-            line = self.text[lineIndex]
+            for visualLine in self._wrapLogicalLine(line, lineIndex):
+                self.cachedVisualLines.append(visualLine)
 
-            if line == '':
-                self._appendVisualLine('', lineIndex, 0)
-                continue
-
-            start = lineStartColumn if lineIndex == startLine else 0
-            while start < len(line):
-                end = self.findVisualLineEnd(line, start)
-
-                if end == len(line):
-                    self._appendVisualLine(line[start:end], lineIndex, start)
-                    break
-
-                if end == start:
-                    end = start + 1
-                    self._appendVisualLine(line[start:end], lineIndex, start)
-                    start = end
-
-                else:
-                    lastSpace = line.rfind(' ', start, end + 1)
-
-                    if lastSpace >= start and line[start:lastSpace].strip() != '':
-                        self._appendVisualLine(
-                            line[start : lastSpace + 1], lineIndex, start
-                        )
-                        start = lastSpace + 1
-
-                    else:
-                        self._appendVisualLine(line[start:end], lineIndex, start)
-                        start = end
+            rangeEnd = len(self.cachedVisualLines)
+            self.visualLineRanges[lineIndex] = (rangeStart, rangeEnd)
 
         self.updateLayout()
 
-    def _getReflowStart(self, lineIndex: int, column: int) -> tuple[int, int]:
-        lineStart, lineEnd = self.visualLineRanges.get(
-            lineIndex, (len(self.cachedVisualLines), len(self.cachedVisualLines))
+
+    def _wrapLogicalLine(self, line: str, lineIndex: int) -> list[VisualLine]:
+        if line == '':
+            return [self._makeVisualLine('', lineIndex, 0)]
+
+        visualLines = []
+        start = 0
+
+        while start < len(line):
+            end = self.findVisualLineEnd(line, start)
+
+            if end == len(line):
+                visualLines.append(self._makeVisualLine(line[start:end], lineIndex, start))
+                break
+
+            if end == start:
+                end = start + 1
+                visualLines.append(self._makeVisualLine(line[start:end], lineIndex, start))
+                start = end
+                continue
+
+            lastSpace = line.rfind(' ', start, end + 1)
+            canWrapBySpace = lastSpace >= start and line[start:lastSpace].strip() != ''
+
+            if canWrapBySpace:
+                visualLines.append(
+                    self._makeVisualLine(line[start : lastSpace + 1], lineIndex, start)
+                )
+                start = lastSpace + 1
+            else:
+                visualLines.append(self._makeVisualLine(line[start:end], lineIndex, start))
+                start = end
+
+        return visualLines
+
+
+    def _makeVisualLine(self, text: str, lineIndex: int, startAt: int) -> VisualLine:
+        return VisualLine(
+            text=text,
+            lineIndex=lineIndex,
+            startAt=startAt,
+            prefixWidths=self.buildPrefixWidths(text),
         )
 
-        for visualLineIndex in range(lineStart, lineEnd):
-            visualLine = self.cachedVisualLines[visualLineIndex]
-            visualLineEnd = visualLine.startAt + len(visualLine.text)
-
-            if column < visualLineEnd:
-                return visualLineIndex, visualLine.startAt
-
-            if column == visualLineEnd:
-                nextVisualLineIndex = visualLineIndex + 1
-                if nextVisualLineIndex < lineEnd:
-                    return (
-                        nextVisualLineIndex,
-                        self.cachedVisualLines[nextVisualLineIndex].startAt,
-                    )
-                return visualLineIndex, visualLine.startAt
-
-        if lineEnd > lineStart:
-            lastVisualLine = self.cachedVisualLines[lineEnd - 1]
-            return lineEnd - 1, lastVisualLine.startAt
-
-        return len(self.cachedVisualLines), 0
-
-    def _appendVisualLine(self, text: str, lineIndex: int, startAt: int) -> None:
-        visualLineIndex = len(self.cachedVisualLines)
-        self.cachedVisualLines.append(
-            VisualLine(
-                text, lineIndex, startAt, prefixWidths=self.buildPrefixWidths(text)
-            )
-        )
-
-        if lineIndex in self.visualLineRanges:
-            self.visualLineRanges[lineIndex] = (
-                self.visualLineRanges[lineIndex][0],
-                visualLineIndex + 1,
-            )
-        else:
-            self.visualLineRanges[lineIndex] = (visualLineIndex, visualLineIndex + 1)
 
     def findVisualLineEnd(self, line: str, start: int) -> int:
         return (
