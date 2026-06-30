@@ -1,5 +1,4 @@
-# from pygame_widgets.mouse import Mouse
-from mouse import Mouse
+from pygame_widgets.mouse import Mouse
 from pygame_widgets.widget import WidgetHandler
 
 from pygame.event import Event

@@ -4,21 +4,17 @@ import sys
 import pygame
 import pygame.freetype
 
-# import pygame_widgets
-import __init__ as pygame_widgets
+import pygame_widgets
 from pygame_widgets.widget import WidgetBase
+from pygame_widgets.mouse import Mouse, MouseState
 
-# from pygame_widgets.mouse import Mouse, MouseState
-from mouse import Mouse, MouseState
-
-from bisect import bisect_right
 from dataclasses import dataclass, field, replace
 from collections import OrderedDict
 
 from typing import Literal, NamedTuple
 
 
-def _emptyCallback(*args, **kwargs) -> None:
+def _emptyCallback() -> None:
     pass
 
 
@@ -86,8 +82,6 @@ class TextBox(WidgetBase):
         y: int,
         width: int,
         height: int,
-        minHeight: int = None,
-        maxHeight: int = None,
         placeholderText: str = '',
         repeatDelay: float = REPEAT_DELAY,
         repeatInterval: float = REPEAT_INTERVAL,
@@ -160,9 +154,6 @@ class TextBox(WidgetBase):
         self.onTextChangedParams = onTextChangedParams
 
         # Layout
-        self._height = height
-        self._minHeight = minHeight
-        self._maxHeight = maxHeight
         self.firstVisibleLineIndex = 0
         self.reconfigureLayout()
 
@@ -170,14 +161,6 @@ class TextBox(WidgetBase):
         self._renderedTextCache = OrderedDict()
 
     def reconfigureLayout(self) -> None:
-        if self._minHeight is None:
-            self._minHeight = self._height
-
-        if self._maxHeight is None:
-            self._maxHeight = self._height
-        else:
-            self._maxHeight = max(self._height, self._maxHeight)
-
         self._actualWidth = (
             self._width
             - self.textOffsetRight
@@ -258,7 +241,7 @@ class TextBox(WidgetBase):
             self.eraseText(event, direction=1)
 
         elif event.key == pygame.K_RETURN:
-            self.processReturn()
+            self.processReturn(event)
 
         elif event.key == pygame.K_UP or (
             event.key == pygame.K_KP_8 and not event.mod & pygame.KMOD_NUM
@@ -524,7 +507,7 @@ class TextBox(WidgetBase):
         maxScroll = max(0, len(self.cachedVisualLines) - self.maxVisibleLines)
         self.firstVisibleLineIndex = max(0, min(self.firstVisibleLineIndex, maxScroll))
 
-    def processReturn(self, event: list[pygame.Event]) -> None:
+    def processReturn(self, event: pygame.Event) -> None:
         if self.style.readOnly:
             return
         if event.mod & pygame.KMOD_SHIFT or event.mod & pygame.KMOD_CTRL:
@@ -792,14 +775,6 @@ class TextBox(WidgetBase):
         self.firstVisibleLineIndex = max(0, min(self.firstVisibleLineIndex, maxScroll))
 
     def updateLayout(self) -> None:
-        neededHeight = (
-            len(self.cachedVisualLines) * self.lineHeight
-            + self.textOffsetTop
-            + self.style.borderThickness * 2
-        )
-
-        self._height = max(self._minHeight, min(neededHeight, self._maxHeight))
-
         self._actualHeight = (
             self._height - self.textOffsetTop - self.style.borderThickness * 2
         )
@@ -921,15 +896,10 @@ class TextBox(WidgetBase):
 
 
     def findVisualLineEnd(self, line: str, start: int) -> int:
-        return (
-            bisect_right(
-                range(len(line) + 1),
-                self._actualWidth,
-                lo=start + 1,
-                key=lambda end: self.getTextWidth(line[start:end]),
-            )
-            - 1
-        )
+        end = start + 1
+        while end <= len(line) and self.getTextWidth(line[start:end]) <= self._actualWidth:
+             end += 1
+        return end - 1
 
     def resetSelection(self) -> None:
         self.selectionStart.set(self.cursor.line, self.cursor.column, self.text)
@@ -1179,8 +1149,7 @@ if __name__ == '__main__':
         x=100,
         y=100,
         width=800,
-        height=100,
-        maxHeight=450,
+        height=400,
         fontSize=50,
         borderColour=(255, 0, 0),
         textColour=(0, 200, 0),
