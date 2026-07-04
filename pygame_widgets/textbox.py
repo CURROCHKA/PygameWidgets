@@ -744,7 +744,7 @@ class TextBox(WidgetBase):
     def processInsert(self) -> None:
         self.insertOn = not self.insertOn
 
-    def updateRepeatEvent(self) -> None:    
+    def updateRepeatEvent(self) -> None:
         if self.repeatEvent is None:
             return
 
@@ -850,7 +850,6 @@ class TextBox(WidgetBase):
 
         self.updateLayout()
 
-
     def _wrapLogicalLine(self, line: str, lineIndex: int) -> list[VisualLine]:
         if line == '':
             return [self._makeVisualLine('', lineIndex, 0)]
@@ -862,12 +861,16 @@ class TextBox(WidgetBase):
             end = self.findVisualLineEnd(line, start)
 
             if end == len(line):
-                visualLines.append(self._makeVisualLine(line[start:end], lineIndex, start))
+                visualLines.append(
+                    self._makeVisualLine(line[start:end], lineIndex, start)
+                )
                 break
 
             if end == start:
                 end = start + 1
-                visualLines.append(self._makeVisualLine(line[start:end], lineIndex, start))
+                visualLines.append(
+                    self._makeVisualLine(line[start:end], lineIndex, start)
+                )
                 start = end
                 continue
 
@@ -880,11 +883,12 @@ class TextBox(WidgetBase):
                 )
                 start = lastSpace + 1
             else:
-                visualLines.append(self._makeVisualLine(line[start:end], lineIndex, start))
+                visualLines.append(
+                    self._makeVisualLine(line[start:end], lineIndex, start)
+                )
                 start = end
 
         return visualLines
-
 
     def _makeVisualLine(self, text: str, lineIndex: int, startAt: int) -> VisualLine:
         return VisualLine(
@@ -894,11 +898,12 @@ class TextBox(WidgetBase):
             prefixWidths=self.buildPrefixWidths(text),
         )
 
-
     def findVisualLineEnd(self, line: str, start: int) -> int:
         end = start + 1
-        while end <= len(line) and self.getTextWidth(line[start:end]) <= self._actualWidth:
-             end += 1
+        while (
+            end <= len(line) and self.getTextWidth(line[start:end]) <= self._actualWidth
+        ):
+            end += 1
         return end - 1
 
     def resetSelection(self) -> None:
