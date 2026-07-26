@@ -57,6 +57,7 @@ class TextBoxStyle:
     cursorAlpha: int = 63
 
     selectionColour: tuple[int, int, int] = (166, 210, 255)
+    textColoutUnderSelection: tuple[int, int, int] = (255, 255, 255)  # TODO: add textColoutUnderSelection functionality
 
     placeholderTextColour: tuple[int, int, int] = (10, 10, 10)
 
@@ -108,9 +109,10 @@ class TextBox(WidgetBase):
         else:
             self.style = replace(style, **styleKwargs)
 
-        self.font = self.style.font or pygame.freetype.SysFont(
-            'calibri', self.style.fontSize
-        )
+        if self.style.font is not None:
+            self.font = self.style.font
+        else:
+            self.font = pygame.freetype.SysFont('calibri', self.style.fontSize)
         self.font.pad = True
 
         # Widget state
@@ -176,7 +178,7 @@ class TextBox(WidgetBase):
 
         self.maxVisibleLines = max(1, self._actualHeight // self.lineHeight)
 
-    def listen(self, events) -> None:
+    def listen(self, events: list[pygame.event.Event]) -> None:
         if self._hidden or self._disabled:
             return
 

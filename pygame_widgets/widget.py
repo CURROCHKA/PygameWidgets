@@ -255,5 +255,5 @@ class WidgetHandler:
             print(f'Error: Tried to move {widget} to bottom when {widget} not in WidgetHandler.')
 
     @staticmethod
-    def getWidgets() -> [WidgetBase]:
+    def getWidgets() -> OrderedWeakset[weakref.ref]:
         return WidgetHandler._widgets
