@@ -3,6 +3,7 @@ import sys
 
 import pygame
 import pygame.freetype
+from pygame.typing import ColorLike
 
 import pygame_widgets
 from pygame_widgets.widget import WidgetBase
@@ -40,6 +41,22 @@ class VisualLine(NamedTuple):
     startAt: int
     prefixWidths: list[int]
 
+    def getOffset(self, column: int) -> int:
+        """Return the x offset for a cursor column within this visual line.
+
+        ``column`` is local to this visual fragment, not the original logical
+        line. Out-of-range values are clamped so drawing code can safely ask for
+        the start or end offset without repeating bounds checks.
+
+        Args:
+            column: Cursor column local to this visual line.
+
+        Returns:
+            Pixel offset from the visual line's left edge.
+        """
+        column = max(0, min(column, len(self.prefixWidths) - 1))
+        return self.prefixWidths[column]
+
 
 @dataclass
 class TextBoxStyle:
@@ -57,7 +74,7 @@ class TextBoxStyle:
     cursorAlpha: int = 63
 
     selectionColour: tuple[int, int, int] = (166, 210, 255)
-    textColoutUnderSelection: tuple[int, int, int] = (255, 255, 255)  # TODO: add textColoutUnderSelection functionality
+    textColourUnderSelection: tuple[int, int, int] = (255, 255, 255)  # TODO: add textColourUnderSelection functionality
 
     placeholderTextColour: tuple[int, int, int] = (10, 10, 10)
 
@@ -155,12 +172,13 @@ class TextBox(WidgetBase):
         self.onTextChanged = onTextChanged
         self.onTextChangedParams = onTextChangedParams
 
+        # Cache
+        self._widthCache = OrderedDict()
+        self._renderedTextCache = OrderedDict()
+
         # Layout
         self.firstVisibleLineIndex = 0
         self.reconfigureLayout()
-
-        self._widthCache = OrderedDict()
-        self._renderedTextCache = OrderedDict()
 
     def reconfigureLayout(self) -> None:
         self._actualWidth = (
@@ -177,6 +195,8 @@ class TextBox(WidgetBase):
         self._actualY = self._y + self.textOffsetTop + self.style.borderThickness
 
         self.maxVisibleLines = max(1, self._actualHeight // self.lineHeight)
+
+        self.setVisualLines()
 
     def listen(self, events: list[pygame.event.Event]) -> None:
         if self._hidden or self._disabled:
@@ -290,7 +310,7 @@ class TextBox(WidgetBase):
         elif event.key == pygame.K_INSERT or (
             event.key == pygame.K_KP_0 and not event.mod & pygame.KMOD_NUM
         ):
-            self.processInsert(self)
+            self.processInsert()
 
         elif event.key == pygame.K_ESCAPE:
             self.escape()
@@ -329,6 +349,9 @@ class TextBox(WidgetBase):
             displayLines = self.cachedVisualLines
             colour = self.style.textColour
 
+        if not self.isEmptySelection():
+            start, end = self.getNormalizedSelection()
+
         for i in range(
             self.firstVisibleLineIndex,
             min(self.firstVisibleLineIndex + self.maxVisibleLines, len(displayLines)),
@@ -336,8 +359,33 @@ class TextBox(WidgetBase):
             visualLine = displayLines[i]
 
             lineY = self._actualY + (i - self.firstVisibleLineIndex) * self.lineHeight
-            textSurface = self.getRenderedTextSurface(visualLine.text, colour)
-            self.win.blit(textSurface, (self._actualX, lineY))
+            
+            if self.isEmptySelection() or not start.line <= visualLine.lineIndex <= end.line:
+                textSurface = self.getRenderedTextSurface(visualLine.text, colour)
+                self.win.blit(textSurface, (self._actualX, lineY))
+            
+            else:
+                startColumn = start.column if visualLine.lineIndex == start.line else 0
+                endColumn = end.column if visualLine.lineIndex == end.line else len(self.text[visualLine.lineIndex])
+
+                localStart = max(0, startColumn - visualLine.startAt)
+                localEnd = min(len(visualLine.text), endColumn - visualLine.startAt)
+                
+                textBeforeSelection = visualLine.text[: localStart]
+                textUnderSelection = visualLine.text[localStart : localEnd]
+                textAfterSelection = visualLine.text[localEnd: ]
+                
+                if textBeforeSelection:
+                    textSurface = self.getRenderedTextSurface(textBeforeSelection, colour)
+                    self.win.blit(textSurface, (self._actualX, lineY))
+                    
+                if textUnderSelection:
+                    textSurface = self.getRenderedTextSurface(textUnderSelection, self.style.textColourUnderSelection)
+                    self.win.blit(textSurface, (self._actualX + visualLine.getOffset(localStart), lineY))
+                    
+                if textAfterSelection:
+                    textSurface = self.getRenderedTextSurface(textAfterSelection, colour)
+                    self.win.blit(textSurface, (self._actualX + visualLine.getOffset(localEnd), lineY))
 
     def _drawCursor(self) -> None:
         if self.selected and self.showCursor:
@@ -353,8 +401,8 @@ class TextBox(WidgetBase):
             if visualLineIndex != -1:
                 visualLine = self.cachedVisualLines[visualLineIndex]
 
-                relativeColumn = self.cursor.column - visualLine.startAt
-                startX = self._actualX + self.getVisualWidth(visualLine, relativeColumn)
+                localStart = self.cursor.column - visualLine.startAt
+                startX = self._actualX + visualLine.getOffset(localStart)
                 endX = startX
 
                 startY = self._actualY + self.lineHeight * (
@@ -451,8 +499,8 @@ class TextBox(WidgetBase):
             if localStart == localEnd and not (isEmptyLine or isEndOfLogicalLine):
                 continue
 
-            textBeforeWidth = self.getVisualWidth(visualLine, localStart)
-            textUpToEndWidth = self.getVisualWidth(visualLine, localEnd)
+            textBeforeWidth = visualLine.getOffset(localStart)
+            textUpToEndWidth = visualLine.getOffset(localEnd)
 
             textWidth = textUpToEndWidth - textBeforeWidth
 
@@ -838,6 +886,17 @@ class TextBox(WidgetBase):
         return self.selectionStart, self.selectionEnd
 
     def setVisualLines(self) -> None:
+        """Rebuild the soft-wrapped visual-line cache from ``self.text``.
+
+        ``self.text`` stores logical lines split only by hard newlines. This
+        method derives ``cachedVisualLines`` for drawing, cursor navigation,
+        selection and scrolling. ``visualLineRanges`` maps each logical line
+        index to a half-open range in ``cachedVisualLines`` so lookups can scan
+        only that line's wrapped fragments.
+
+        Call this after text changes, or after layout/font changes once the
+        widget's text area measurements have been refreshed.
+        """
         self.cachedVisualLines = []
         self.visualLineRanges = {}
 
@@ -853,6 +912,30 @@ class TextBox(WidgetBase):
         self.updateLayout()
 
     def _wrapLogicalLine(self, line: str, lineIndex: int) -> list[VisualLine]:
+        """Soft-wrap a single logical line into ``VisualLine`` fragments.
+
+        ``line`` is one entry of ``self.text``. The returned fragments are in
+        drawing order and all point back to ``lineIndex``; ``startAt`` stores
+        the fragment's starting column in the original logical line.
+
+        The loop asks ``findVisualLineEnd`` for the largest substring that fits
+        in the text area. If there is more text after that point, it tries to
+        move the break to the last space in the candidate window and keeps that
+        space at the end of the current visual line. If no useful space exists,
+        it breaks at the measured boundary. When even one character is wider
+        than the available width, the method emits that character anyway so the
+        loop cannot stall.
+
+        Empty logical lines return one empty visual line so blank rows remain
+        addressable by cursor, selection and scrolling code.
+
+        Args:
+            line: Logical line text without its trailing newline.
+            lineIndex: Index of ``line`` inside ``self.text``.
+
+        Returns:
+            Visual-line fragments that cover the whole logical line.
+        """
         if line == '':
             return [self._makeVisualLine('', lineIndex, 0)]
 
@@ -893,6 +976,22 @@ class TextBox(WidgetBase):
         return visualLines
 
     def _makeVisualLine(self, text: str, lineIndex: int, startAt: int) -> VisualLine:
+        """Create a ``VisualLine`` and precompute cursor offsets for its text.
+
+        ``startAt`` is the column where ``text`` begins inside the original
+        logical line. ``prefixWidths`` has one more entry than ``text``: index 0
+        is the left edge, and every later index is the x offset after that many
+        characters. The drawing and hit-testing paths use those offsets instead
+        of remeasuring the same substrings repeatedly.
+
+        Args:
+            text: Text displayed by this visual line fragment.
+            lineIndex: Index of the source logical line in ``self.text``.
+            startAt: Starting column of ``text`` in the source logical line.
+
+        Returns:
+            A ``VisualLine`` with precomputed prefix widths.
+        """
         return VisualLine(
             text=text,
             lineIndex=lineIndex,
@@ -901,18 +1000,61 @@ class TextBox(WidgetBase):
         )
 
     def findVisualLineEnd(self, line: str, start: int) -> int:
-        end = start + 1
-        while (
-            end <= len(line) and self.getTextWidth(line[start:end]) <= self._actualWidth
-        ):
-            end += 1
-        return end - 1
+        """Return the exclusive end column of the widest substring that fits.
+
+        The search checks candidate end columns with binary search. ``low`` is
+        the largest known fitting end column, while ``high`` is the first known
+        non-fitting end column or the sentinel just after ``len(line)``. The
+        returned value is suitable for Python slicing, so
+        ``line[start:return_value]`` is the measured fragment.
+
+        If the first character is already too wide, no candidate slice is
+        accepted and the method returns ``start``. ``_wrapLogicalLine`` handles
+        that case by emitting one character anyway, which guarantees progress.
+
+        Args:
+            line: Logical line being wrapped.
+            start: Column where the candidate visual line begins.
+
+        Returns:
+            Exclusive end column for the largest fitting slice.
+        """
+        low = start
+        high = len(line) + 1
+
+        while low + 1 < high:
+            candidateEnd = (low + high) // 2
+            if self.getTextWidth(line[start:candidateEnd]) <= self._actualWidth:
+                low = candidateEnd
+            else:
+                high = candidateEnd
+
+        return low
 
     def resetSelection(self) -> None:
         self.selectionStart.set(self.cursor.line, self.cursor.column, self.text)
         self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
 
     def getVisualLineIndex(self, cursor: Cursor) -> int:
+        """Find the cached visual line that contains ``cursor``.
+
+        The lookup first narrows the scan with ``visualLineRanges`` for the
+        cursor's logical line. Cursor columns are logical-line columns, so each
+        visual fragment is matched by
+        ``startAt <= column <= startAt + len(text)``.
+
+        When the cursor sits exactly at the end of a wrapped fragment and
+        another fragment from the same logical line follows, this returns the
+        next fragment. That draws the caret at the start of the next screen row,
+        matching normal wrapped-text editing behavior.
+
+        Args:
+            cursor: Logical cursor position to locate.
+
+        Returns:
+            Index in ``cachedVisualLines``, or -1 if no matching visual line is
+            cached.
+        """
         startIndex, endIndex = self.visualLineRanges.get(
             cursor.line, (0, len(self.cachedVisualLines))
         )
@@ -933,20 +1075,39 @@ class TextBox(WidgetBase):
                 return lineIndex
         return -1
 
-    def getTextWidth(self, text: str) -> int:
-        if text in self._widthCache:
-            self._widthCache.move_to_end(text)
-            return self._widthCache[text]
+    def getTextWidth(self, text: str, style: int = 0) -> int:
+        cacheKey = (text, style)
+
+        if cacheKey in self._widthCache:
+            self._widthCache.move_to_end(cacheKey)
+            return self._widthCache[cacheKey]
 
         if len(self._widthCache) >= self.WIDTH_CACHE_SIZE:
             self._widthCache.popitem(last=False)
 
-        width = self.font.get_rect(text).width
-        self._widthCache[text] = width
+        width = self.font.get_rect(text, style=style).width
+        self._widthCache[cacheKey] = width
 
         return width
 
     def buildPrefixWidths(self, text: str) -> list[int]:
+        """Build x offsets for every cursor position inside ``text``.
+
+        The returned list always starts with 0 and contains one entry per cursor
+        position, including the position after the last character. For example,
+        ``prefixWidths[3]`` is the pixel offset after the first three
+        characters.
+
+        Most characters use freetype glyph advance from ``get_metrics``. If
+        metrics are missing for a character, the code falls back to measuring
+        that character through ``getTextWidth``.
+
+        Args:
+            text: Visual-line text whose cursor offsets should be measured.
+
+        Returns:
+            Pixel offsets for cursor columns 0 through ``len(text)``.
+        """
         widths = [0]
         metrics = self.font.get_metrics(text)
         cumulative = 0
@@ -958,15 +1119,10 @@ class TextBox(WidgetBase):
             widths.append(cumulative)
         return widths
 
-    def getVisualWidth(self, visualLine: VisualLine, column: int) -> int:
-        prefixWidths = visualLine.prefixWidths
-        column = max(0, min(column, len(prefixWidths) - 1))
-        return prefixWidths[column]
-
     def getRenderedTextSurface(
-        self, text: str, colour: tuple[int, int, int, int] | pygame.Color
+        self, text: str, colour: ColorLike, style: int = 0,
     ) -> pygame.Surface:
-        cacheKey = (text, colour)
+        cacheKey = (text, colour, style)
 
         if cacheKey in self._renderedTextCache:
             self._renderedTextCache.move_to_end(cacheKey)
@@ -975,7 +1131,7 @@ class TextBox(WidgetBase):
         if len(self._renderedTextCache) >= self.RENDER_CACHE_SIZE:
             self._renderedTextCache.popitem(last=False)
 
-        rendered = self.font.render(text, fgcolor=colour)[0]
+        rendered = self.font.render(text, fgcolor=colour, style=style)[0]
         self._renderedTextCache[cacheKey] = rendered
         return rendered
 
@@ -1012,6 +1168,12 @@ class TextBox(WidgetBase):
         self.addText(text, callOnTextChanged=False)
 
     def setPreferredColumn(self) -> None:
+        """Remember the cursor's visual-column target for vertical movement.
+
+        Horizontal movement and mouse placement update this value. Up/down
+        movement then tries to keep the same local column inside the next visual
+        line, clamping only when that target line is shorter.
+        """
         visualLineIndex = self.getVisualLineIndex(self.cursor)
 
         if visualLineIndex != -1:
@@ -1048,6 +1210,18 @@ class TextBox(WidgetBase):
         self.cursor.set(line, col, self.text)
 
     def setCursorFromMouse(self, mouseX: int, mouseY: int) -> None:
+        """Move the cursor to the text position closest to a mouse coordinate.
+
+        The y coordinate selects a visible ``VisualLine`` after clamping to the
+        text area. The x coordinate is compared with midpoint positions between
+        adjacent prefix widths, which chooses the nearest insertion column
+        inside that visual fragment. The final cursor column is converted back
+        to a logical-line column by adding ``visualLine.startAt``.
+
+        Args:
+            mouseX: Mouse x coordinate in window space.
+            mouseY: Mouse y coordinate in window space.
+        """
         if not self.cachedVisualLines:
             return
 
