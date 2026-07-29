@@ -1,17 +1,11 @@
 import pygame_widgets
-from pygame_widgets import Mouse
 from pygame_widgets.widget import WidgetBase
 from pygame_widgets.textbox import TextBox
 from pygame_widgets.dropdown import Dropdown, DropdownChoice
 
 
 class ComboBox(Dropdown):
-    def __init__(
-            self, win, x, y, width, height,
-            choices,
-            textboxKwargs=None,
-            **kwargs
-    ):
+    def __init__(self, win, x, y, width, height, choices, textboxKwargs=None, **kwargs):
         """Initialise a customisable combo box for Pygame. Acts like a searchable dropdown.
 
         :param win: Surface on which to draw
@@ -49,9 +43,14 @@ class ComboBox(Dropdown):
                 textboxKwargs[key] = value
 
         self.textBar = TextBox(
-            win, x, y, width, height, isSubWidget=True,
+            win,
+            x,
+            y,
+            width,
+            height,
+            isSubWidget=True,
             onTextChanged=self.updateSearchResults,
-            **textboxKwargs
+            **textboxKwargs,
         )
         self.__main = self.textBar
         # Set the number of choices if not given
@@ -96,8 +95,14 @@ class ComboBox(Dropdown):
 
             self.__choices.append(
                 DropdownChoice(
-                    self.win, x, y, width, height,
-                    text=text, dropdown=self, value=i,
+                    self.win,
+                    x,
+                    y,
+                    width,
+                    height,
+                    text=text,
+                    dropdown=self,
+                    value=i,
                     last=(i == self.maxResults - 1),
                     **kwargs,
                 )
@@ -120,6 +125,16 @@ class ComboBox(Dropdown):
                     if dropdownChoice.clicked:
                         # The choice was clicked by user
                         self.textBar.setText(dropdownChoice.text)
+                        # TODO 
+                        # Если написать какой нибудь цвет,
+                        # потом выбрать его из выпадающего меню,
+                        # затем кликнуть два раза (double click) по textbox,
+                        # то у меня блокируются какие либо действия в самом textbox,
+                        # хотя курсор горит, что говорит об активности виджета.
+                        # Но стоит мне два раза нажать backspace - все действия становятся доступны.
+                        # И срабатывает это как бутдто не всегда.
+                        # Честно говоря, понятия не имею где может быть ошибка.
+                        # Не ясно даже кто виноват: combobox или textbox
                         self.onSelected(*self.onSelectedParams)
 
             # Whether the search is started or stopped
@@ -150,8 +165,9 @@ class ComboBox(Dropdown):
                     dropdownChoice.draw()
 
     def contains(self, x, y):
-        return super(Dropdown, self).contains(x, y) or \
-               (any([c.contains(x, y) for c in self.__choices]) and self._dropped)
+        return super(Dropdown, self).contains(x, y) or (
+            any([c.contains(x, y) for c in self.__choices]) and self._dropped
+        )
 
     def updateSearchResults(self):
         """Update the suggested results based on selected text.
@@ -177,14 +193,10 @@ class ComboBox(Dropdown):
         """Return the suggestions of text in choices."""
 
         # First add the ones that perfectly match case
-        suggestions = [
-            choice for choice in choices
-            if choice.startswith(text)
-        ]
+        suggestions = [choice for choice in choices if choice.startswith(text)]
         # Then add the ones that include text
         suggestions += [
-            choice for choice in choices
-            if text in choice and choice not in suggestions
+            choice for choice in choices if text in choice and choice not in suggestions
         ]
         return suggestions
 
@@ -197,24 +209,39 @@ if __name__ == '__main__':
     win = pygame.display.set_mode((600, 600))
 
     comboBox = ComboBox(
-        win, 120, 10, 250, 50, name='Select Colour',
+        win,
+        120,
+        10,
+        250,
+        50,
+        name='Select Colour',
         choices=pygame.colordict.THECOLORS.keys(),
         maxResults=4,
         font=pygame.font.SysFont('calibri', 30),
-        borderRadius=3, colour=(0, 200, 50), direction='down',
-        textHAlign='left'
+        borderRadius=3,
+        colour=(0, 200, 50),
+        direction='down',
+        textHAlign='left',
     )
-
 
     def output():
         comboBox.textBar.colour = comboBox.getText()
 
-
     button = Button(
-        win, 10, 10, 100, 50, text='Set Colour', fontSize=30,
-        margin=15, inactiveColour=(200, 0, 100), pressedColour=(0, 255, 0),
-        radius=5, onClick=output, font=pygame.font.SysFont('calibri', 18),
-        textVAlign='bottom'
+        win,
+        10,
+        10,
+        100,
+        50,
+        text='Set Colour',
+        fontSize=30,
+        margin=15,
+        inactiveColour=(200, 0, 100),
+        pressedColour=(0, 255, 0),
+        radius=5,
+        onClick=output,
+        font=pygame.font.SysFont('calibri', 18),
+        textVAlign='bottom',
     )
 
     run = True

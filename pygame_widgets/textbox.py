@@ -130,9 +130,11 @@ class TextBox(WidgetBase):
         else:
             self.style = replace(style, **styleKwargs)
 
-        if self.style.font is not None:
+        if isinstance(self.style.font, pygame.freetype.Font):
             self.font = self.style.font
         else:
+            if self.style.font is not None:
+                print('Use pygame.freetype.Font or pygame.freetype.SysFont')
             self.font = pygame.freetype.SysFont('calibri', self.style.fontSize)
         self.font.pad = True
 
