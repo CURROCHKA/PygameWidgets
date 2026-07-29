@@ -74,7 +74,11 @@ class TextBoxStyle:
     cursorAlpha: int = 63
 
     selectionColour: tuple[int, int, int] = (166, 210, 255)
-    textColourUnderSelection: tuple[int, int, int] = (255, 255, 255)  # TODO: add textColourUnderSelection functionality
+    textColourUnderSelection: tuple[int, int, int] = (
+        255,
+        255,
+        255,
+    )
 
     placeholderTextColour: tuple[int, int, int] = (10, 10, 10)
 
@@ -359,33 +363,52 @@ class TextBox(WidgetBase):
             visualLine = displayLines[i]
 
             lineY = self._actualY + (i - self.firstVisibleLineIndex) * self.lineHeight
-            
-            if self.isEmptySelection() or not start.line <= visualLine.lineIndex <= end.line:
+
+            if (
+                self.isEmptySelection()
+                or not start.line <= visualLine.lineIndex <= end.line
+            ):
                 textSurface = self.getRenderedTextSurface(visualLine.text, colour)
                 self.win.blit(textSurface, (self._actualX, lineY))
-            
+
             else:
                 startColumn = start.column if visualLine.lineIndex == start.line else 0
-                endColumn = end.column if visualLine.lineIndex == end.line else len(self.text[visualLine.lineIndex])
+                endColumn = (
+                    end.column
+                    if visualLine.lineIndex == end.line
+                    else len(self.text[visualLine.lineIndex])
+                )
 
                 localStart = max(0, startColumn - visualLine.startAt)
                 localEnd = min(len(visualLine.text), endColumn - visualLine.startAt)
-                
-                textBeforeSelection = visualLine.text[: localStart]
-                textUnderSelection = visualLine.text[localStart : localEnd]
-                textAfterSelection = visualLine.text[localEnd: ]
-                
+
+                textBeforeSelection = visualLine.text[:localStart]
+                textUnderSelection = visualLine.text[localStart:localEnd]
+                textAfterSelection = visualLine.text[localEnd:]
+
                 if textBeforeSelection:
-                    textSurface = self.getRenderedTextSurface(textBeforeSelection, colour)
+                    textSurface = self.getRenderedTextSurface(
+                        textBeforeSelection, colour
+                    )
                     self.win.blit(textSurface, (self._actualX, lineY))
-                    
+
                 if textUnderSelection:
-                    textSurface = self.getRenderedTextSurface(textUnderSelection, self.style.textColourUnderSelection)
-                    self.win.blit(textSurface, (self._actualX + visualLine.getOffset(localStart), lineY))
-                    
+                    textSurface = self.getRenderedTextSurface(
+                        textUnderSelection, self.style.textColourUnderSelection
+                    )
+                    self.win.blit(
+                        textSurface,
+                        (self._actualX + visualLine.getOffset(localStart), lineY),
+                    )
+
                 if textAfterSelection:
-                    textSurface = self.getRenderedTextSurface(textAfterSelection, colour)
-                    self.win.blit(textSurface, (self._actualX + visualLine.getOffset(localEnd), lineY))
+                    textSurface = self.getRenderedTextSurface(
+                        textAfterSelection, colour
+                    )
+                    self.win.blit(
+                        textSurface,
+                        (self._actualX + visualLine.getOffset(localEnd), lineY),
+                    )
 
     def _drawCursor(self) -> None:
         if self.selected and self.showCursor:
@@ -1113,14 +1136,17 @@ class TextBox(WidgetBase):
         cumulative = 0
         for i, glyph in enumerate(metrics):
             if glyph:
-                cumulative += glyph[4]
+                cumulative += int(glyph[4])
             else:
                 cumulative += self.getTextWidth(text[i])
             widths.append(cumulative)
         return widths
 
     def getRenderedTextSurface(
-        self, text: str, colour: ColorLike, style: int = 0,
+        self,
+        text: str,
+        colour: ColorLike,
+        style: int = 0,
     ) -> pygame.Surface:
         cacheKey = (text, colour, style)
 

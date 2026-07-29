@@ -1,77 +1,111 @@
 import weakref
 
-from collections.abc import MutableSet
+from collections.abc import Iterable, MutableSet, Iterator
 from collections import OrderedDict
 
 from abc import abstractmethod, ABC
+from typing import Any
 
-from pygame.event import Event
+import pygame
 
 from pygame_widgets.mouse import Mouse
 
 
-# Implementation of an insertion-ordered set. Necessary to keep track of the order in which widgets are added.
 class OrderedSet(MutableSet):
-    def __init__(self, values=()):
+    """Insertion-ordered set backed by an ``OrderedDict``.
+
+    This preserves the order in which elements are added, and supports
+    moving existing elements to the front or back of the iteration order.
+    """
+
+    def __init__(self, values: Iterable[Any] = ()):
+        """Initialise the set with optional ``values``."""
         self._od = OrderedDict().fromkeys(values)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._od)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Any]:
         return iter(self._od)
 
-    def __contains__(self, value):
+    def __contains__(self, value: object) -> bool:
         return value in self._od
 
-    def add(self, value):
+    def add(self, value: object) -> None:
+        """Add *value* to the set (at the end if new)."""
         self._od[value] = None
 
-    def discard(self, value):
+    def discard(self, value: object) -> None:
+        """Remove *value* from the set if it is present."""
         self._od.pop(value, None)
 
-    def move_to_end(self, value):
+    def move_to_end(self, value: object) -> None:
+        """Move *value* to the end of the iteration order."""
         self._od.move_to_end(value)
 
-    def move_to_start(self, value):
+    def move_to_start(self, value: object) -> None:
+        """Move *value* to the start of the iteration order."""
         self._od.move_to_end(value, last=False)
 
-    def copy(self):
+    def copy(self) -> 'OrderedSet':
+        """Return a shallow copy of the set."""
         return OrderedSet(values=self._od.keys())
 
 
 class OrderedWeakset(weakref.WeakSet):
-    _remove = ...  # Getting defined after the super().__init__() call
+    """WeakSet whose elements can be reordered.
 
-    def __init__(self, values=()):
+    Wraps an :class:`OrderedSet` internally so that iteration order can be
+    controlled via :meth:`move_to_end` / :meth:`move_to_start`.
+    """
+
+    _remove = ...  # Set by weakref.WeakSet.__init__()
+
+    def __init__(self, values: Iterable = ()):
+        """Initialise the weak set with optional *values*."""
         super(OrderedWeakset, self).__init__()
 
         self.data = OrderedSet()
         for elem in values:
             self.add(elem)
 
-    def move_to_end(self, item):
+    def move_to_end(self, item: object) -> None:
+        """Move *item* to the end of the iteration order."""
         self.data.move_to_end(weakref.ref(item, self._remove))
 
-    def move_to_start(self, item):
+    def move_to_start(self, item: object) -> None:
+        """Move *item* to the start of the iteration order."""
         self.data.move_to_start(weakref.ref(item, self._remove))
 
 
-
 class WidgetBase(ABC):
-    def __init__(self, win, x, y, width, height, isSubWidget=False):
-        """ Base for all widgets
+    """Base class for all pygame-widgets controls.
 
-        :param win: Surface on which to draw
-        :type win: pygame.Surface
-        :param x: X-coordinate of top left
-        :type x: int
-        :param y: Y-coordinate of top left
-        :type y: int
-        :param width: Width of button
-        :type width: int
-        :param height: Height of button
-        :type height: int
+    ``WidgetBase`` stores the shared geometry, visibility and enabled state used
+    by concrete widgets. Top-level widgets automatically register with
+    ``WidgetHandler`` so they can receive events and be drawn in z-order.
+    Sub-widgets are owned by another widget and are not registered separately.
+    """
+
+    def __init__(
+        self,
+        win: pygame.Surface,
+        x: int | float,
+        y: int | float,
+        width: int | float,
+        height: int | float,
+        isSubWidget: bool = False,
+    ) -> None:
+        """Initialize common widget state.
+
+        Args:
+            win: Surface on which the widget is drawn.
+            x: X-coordinate of the widget's top-left corner.
+            y: Y-coordinate of the widget's top-left corner.
+            width: Widget width.
+            height: Widget height.
+            isSubWidget: Whether this widget is owned and drawn by another
+                widget instead of being managed directly by ``WidgetHandler``.
         """
         self.win = win
         self._x = x
@@ -87,118 +121,157 @@ class WidgetBase(ABC):
             WidgetHandler.addWidget(self)
 
     @abstractmethod
-    def listen(self, events):
+    def listen(self, events: list[pygame.Event]) -> None:
+        """Handle input events for this frame."""
         pass
 
     @abstractmethod
-    def draw(self):
+    def draw(self) -> None:
+        """Draw the widget's current state to ``self.win``."""
         pass
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'{type(self).__name__}(x = {self._x}, y = {self._y}, width = {self._width}, height = {self._height})'
 
-    def contains(self, x, y):
-        return (self._x < x - self.win.get_abs_offset()[0] < self._x + self._width) and \
-               (self._y < y - self.win.get_abs_offset()[1] < self._y + self._height)
+    def contains(self, x: int | float, y: int | float) -> bool:
+        """Return whether a point lies inside the widget bounds.
 
-    def hide(self):
+        Args:
+            x: X-coordinate in window space.
+            y: Y-coordinate in window space.
+
+        Returns:
+            ``True`` when the point is strictly inside this widget's rectangle.
+        """
+        return (
+            self._x < x - self.win.get_abs_offset()[0] < self._x + self._width
+        ) and (self._y < y - self.win.get_abs_offset()[1] < self._y + self._height)
+
+    def hide(self) -> None:
+        """Hide the widget and move it behind other top-level widgets."""
         self._hidden = True
         if not self._isSubWidget:
             WidgetHandler.moveToBottom(self)
 
-    def show(self):
+    def show(self) -> None:
+        """Show the widget and move it above other top-level widgets."""
         self._hidden = False
         if not self._isSubWidget:
             WidgetHandler.moveToTop(self)
 
-    def disable(self):
+    def disable(self) -> None:
+        """Prevent the widget from handling input."""
         self._disabled = True
 
-    def enable(self):
+    def enable(self) -> None:
+        """Allow the widget to handle input."""
         self._disabled = False
 
-    def isSubWidget(self):
+    def isSubWidget(self) -> bool:
+        """Return whether this widget is managed by a parent widget."""
         return self._isSubWidget
 
-    def moveToTop(self):
+    def moveToTop(self) -> None:
+        """Move this widget to the top of the global draw/event order."""
         WidgetHandler.moveToTop(self)
 
-    def moveToBottom(self):
+    def moveToBottom(self) -> None:
+        """Move this widget to the bottom of the global draw/event order."""
         WidgetHandler.moveToBottom(self)
 
-    def moveX(self, x):
+    def moveX(self, x: int | float) -> None:
+        """Move the widget horizontally by ``x`` pixels."""
         self._x += x
 
-    def moveY(self, y):
+    def moveY(self, y: int | float) -> None:
+        """Move the widget vertically by ``y`` pixels."""
         self._y += y
 
-    def get(self, attr):
-        """Default setter for any attributes. Call super if overriding
+    def get(self, attr: str) -> Any | None:
+        """Return a supported widget attribute value.
 
-        :param attr: Attribute to get
-        :return: Value of the attribute
+        The base class supports ``'x'``, ``'y'``, ``'width'`` and ``'height'``.
+        Subclasses may extend this method with widget-specific attributes and
+        should call ``super().get(attr)`` for the shared geometry attributes.
+
+        Args:
+            attr: Attribute name to read.
+
+        Returns:
+            Attribute value, or ``None`` when the attribute is not supported.
         """
         if attr == 'x':
             return self._x
-
-        if attr == 'y':
+        elif attr == 'y':
             return self._y
-
-        if attr == 'width':
+        elif attr == 'width':
             return self._width
-
-        if attr == 'height':
+        elif attr == 'height':
             return self._height
 
-    def getX(self):
+    def getX(self) -> int | float:
+        """Return the widget's x-coordinate."""
         return self._x
 
-    def getY(self):
+    def getY(self) -> int | float:
+        """Return the widget's y-coordinate."""
         return self._y
 
-    def getWidth(self):
+    def getWidth(self) -> int | float:
+        """Return the widget width."""
         return self._width
 
-    def getHeight(self):
+    def getHeight(self) -> int | float:
+        """Return the widget height."""
         return self._height
 
-    def isVisible(self):
+    def isVisible(self) -> bool:
+        """Return whether the widget is visible."""
         return not self._hidden
 
-    def isEnabled(self):
+    def isEnabled(self) -> bool:
+        """Return whether the widget can handle input."""
         return not self._disabled
 
-    def set(self, attr, value):
-        """Default setter for any attributes. Call super if overriding
+    def set(self, attr: str, value: Any) -> None:
+        """Set a supported widget attribute value.
 
-        :param attr: Attribute to set
-        :param value: Value to set
+        The base class supports ``'x'``, ``'y'``, ``'width'`` and ``'height'``.
+        Subclasses may extend this method with widget-specific attributes and
+        should call ``super().set(attr, value)`` for the shared geometry
+        attributes.
+
+        Args:
+            attr: Attribute name to update.
+            value: New attribute value.
         """
         if attr == 'x':
             self._x = value
-
-        if attr == 'y':
+        elif attr == 'y':
             self._y = value
-
-        if attr == 'width':
+        elif attr == 'width':
             self._width = value
-
-        if attr == 'height':
+        elif attr == 'height':
             self._height = value
 
-    def setX(self, x):
+    def setX(self, x: int | float) -> None:
+        """Set the widget's x-coordinate."""
         self._x = x
 
-    def setY(self, y):
+    def setY(self, y: int | float) -> None:
+        """Set the widget's y-coordinate."""
         self._y = y
 
-    def setWidth(self, width):
+    def setWidth(self, width: int | float) -> None:
+        """Set the widget width."""
         self._width = width
 
-    def setHeight(self, height):
+    def setHeight(self, height: int | float) -> None:
+        """Set the widget height."""
         self._height = height
 
-    def setIsSubWidget(self, isSubWidget):
+    def setIsSubWidget(self, isSubWidget: bool) -> None:
+        """Update sub-widget ownership and global handler registration."""
         self._isSubWidget = isSubWidget
         if isSubWidget:
             WidgetHandler.removeWidget(self)
@@ -207,16 +280,33 @@ class WidgetBase(ABC):
 
 
 class WidgetHandler:
-    _widgets: OrderedWeakset[weakref.ref] = OrderedWeakset()
+    """Global registry and frame dispatcher for top-level widgets.
+
+    Widgets register here through ``WidgetBase`` unless they are marked as
+    sub-widgets. The registry preserves z-order: widgets moved to the end are
+    considered visually on top, receive mouse events first, and are drawn last.
+    """
+
+    _widgets: OrderedWeakset[WidgetBase] = OrderedWeakset()
 
     @staticmethod
-    def main(events: list[Event]) -> None:
+    def main(events: list[pygame.Event]) -> None:
+        """Process input and draw every registered widget for one frame.
+
+        Event handling walks the widget stack from top to bottom. Once the mouse
+        is over a higher widget, lower widgets are blocked from receiving events
+        for that frame. Drawing then walks from bottom to top so later widgets
+        appear above earlier ones.
+
+        The widget set is copied before iteration so callbacks may add or remove
+        widgets without invalidating the active loop.
+        """
         blocked = False
 
         # Conversion is used to prevent errors when widgets are added/removed during iteration a.k.a safe iteration
         widgets = list(WidgetHandler._widgets)
 
-        for widget in widgets[::-1]:
+        for widget in reversed(widgets):
             if not blocked or not widget.contains(*Mouse.getMousePos()):
                 widget.listen(events)
 
@@ -229,31 +319,42 @@ class WidgetHandler:
 
     @staticmethod
     def addWidget(widget: WidgetBase) -> None:
+        """Register a widget and place it at the top of the stack."""
         if widget not in WidgetHandler._widgets:
             WidgetHandler._widgets.add(widget)
             WidgetHandler.moveToTop(widget)
 
     @staticmethod
     def removeWidget(widget: WidgetBase) -> None:
+        """Remove a widget from the registry."""
         try:
             WidgetHandler._widgets.remove(widget)
-        except ValueError:
-            print(f'Error: Tried to remove {widget} when {widget} not in WidgetHandler.')
+        except KeyError:
+            print(
+                f'Error: Tried to remove {widget} when {widget} not in WidgetHandler.'
+            )
 
     @staticmethod
-    def moveToTop(widget: WidgetBase):
+    def moveToTop(widget: WidgetBase) -> None:
+        """Move a registered widget above all other widgets."""
         try:
             WidgetHandler._widgets.move_to_end(widget)
         except KeyError:
-            print(f'Error: Tried to move {widget} to top when {widget} not in WidgetHandler.')
+            print(
+                f'Error: Tried to move {widget} to top when {widget} not in WidgetHandler.'
+            )
 
     @staticmethod
-    def moveToBottom(widget: WidgetBase):
+    def moveToBottom(widget: WidgetBase) -> None:
+        """Move a registered widget below all other widgets."""
         try:
             WidgetHandler._widgets.move_to_start(widget)
         except KeyError:
-            print(f'Error: Tried to move {widget} to bottom when {widget} not in WidgetHandler.')
+            print(
+                f'Error: Tried to move {widget} to bottom when {widget} not in WidgetHandler.'
+            )
 
     @staticmethod
-    def getWidgets() -> OrderedWeakset[weakref.ref]:
+    def getWidgets() -> OrderedWeakset:
+        """Return the live widget registry."""
         return WidgetHandler._widgets
