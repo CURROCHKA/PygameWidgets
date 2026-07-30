@@ -1,7 +1,8 @@
-import pygame
 import tkinter as tk
-from tkinter import messagebox
 from enum import Enum
+from tkinter import messagebox
+
+import pygame
 
 import pygame_widgets
 from pygame_widgets.widget import WidgetBase
@@ -28,7 +29,7 @@ class Popup(WidgetBase):
         y: int,
         width: int,
         height: int,
-        popupType: PopupType,
+        popup_type: PopupType,
         title: str,
         text: str,
         trigger=lambda *args: None,
@@ -36,7 +37,7 @@ class Popup(WidgetBase):
         **kwargs,
     ):
         super().__init__(win, x, y, width, height)
-        self.popupType = popupType
+        self.popup_type = popup_type
         self.title = title
         self.text = text
         self.trigger = trigger
@@ -44,31 +45,31 @@ class Popup(WidgetBase):
 
         self.margin = kwargs.get("margin", 20)
 
-        self.titleColour = kwargs.get("titleColour", (0, 0, 0))
-        self.titleSize = kwargs.get("titleSize", 40)
-        self.titleFont = kwargs.get(
-            "titleFont", pygame.font.SysFont("calibri", self.titleSize, True)
+        self.title_color = kwargs.get("title_color", (0, 0, 0))
+        self.title_size = kwargs.get("title_size", 40)
+        self.title_font = kwargs.get(
+            "title_font", pygame.font.SysFont("calibri", self.title_size, True)
         )
-        self.titleRect = self.alignTitleRect()
+        self.title_rect = self.align_title_rect()
 
-        self.textColour = kwargs.get("textColour", (0, 0, 0))
-        self.textSize = kwargs.get("textSize", 18)
-        self.textFont = kwargs.get(
-            "textFont", pygame.font.SysFont("calibri", self.textSize)
+        self.text_color = kwargs.get("text_color", (0, 0, 0))
+        self.text_size = kwargs.get("text_size", 18)
+        self.text_font = kwargs.get(
+            "text_font", pygame.font.SysFont("calibri", self.text_size)
         )
-        self.textRect = self.alignTextRect()
+        self.text_rect = self.align_text_rect()
 
         self.radius = kwargs.get("radius", 0)
 
-        self.colour = kwargs.get("colour", (150, 150, 150))
-        self.shadowDistance = kwargs.get("shadowDistance", 0)
-        self.shadowColour = kwargs.get("shadowColour", (210, 210, 180))
+        self.color = kwargs.get("color", (150, 150, 150))
+        self.shadow_distance = kwargs.get("shadow_distance", 0)
+        self.shadow_color = kwargs.get("shadow_color", (210, 210, 180))
 
         self.result = None
 
         self.hide()
 
-    def alignTitleRect(self):
+    def align_title_rect(self):
         return pygame.Rect(
             self._x + self.margin,
             self._y + self.margin,
@@ -76,7 +77,7 @@ class Popup(WidgetBase):
             self._height // 3 - self.margin * 2,
         )
 
-    def alignTextRect(self):
+    def align_text_rect(self):
         return pygame.Rect(
             self._x + self.margin,
             self._y + self._height // 3,
@@ -94,7 +95,7 @@ class Popup(WidgetBase):
 
     def show(self):
         super().show()
-        match self.popupType:
+        match self.popup_type:
             case PopupType.INFO:
                 messagebox.showinfo(self.title, self.text)
             case PopupType.ERROR:
@@ -112,18 +113,20 @@ class Popup(WidgetBase):
             case PopupType.RETRY_CANCEL:
                 self.result = messagebox.askretrycancel(self.title, self.text)
 
-    def getResult(self):
+    def get_result(self):
         return self.result
 
 
 if __name__ == "__main__":
+    import sys
+
     from pygame_widgets.button import Button
 
-    def setButtonColour():
-        if popup.getResult():
-            button.setInactiveColour("green")
-        elif popup.getResult() == False:
-            button.setInactiveColour("red")
+    def set_button_color():
+        if popup.get_result():
+            button.set_inactive_color("green")
+        elif popup.get_result() == False:
+            button.set_inactive_color("red")
 
     pygame.init()
     win = pygame.display.set_mode((600, 600))
@@ -138,10 +141,10 @@ if __name__ == "__main__":
         "Popup",
         "This is the text in the popup. Would you like to continue? The buttons below can be customised.",
         radius=20,
-        textSize=20,
+        text_size=20,
     )
 
-    button = Button(win, 100, 100, 400, 400, text="Popup", onClick=popup.show)
+    button = Button(win, 100, 100, 400, 400, text="Popup", on_click=popup.show)
 
     run = True
     while run:
@@ -150,10 +153,10 @@ if __name__ == "__main__":
             if event.type == pygame.QUIT:
                 pygame.quit()
                 run = False
-                quit()
+                sys.exit()
 
         win.fill((255, 255, 255))
 
         pygame_widgets.update(events)
         pygame.display.update()
-        setButtonColour()
+        set_button_color()
