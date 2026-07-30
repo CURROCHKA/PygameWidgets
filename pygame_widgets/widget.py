@@ -94,7 +94,7 @@ class WidgetBase(ABC):
         y: int | float,
         width: int | float,
         height: int | float,
-        isSubWidget: bool = False,
+        is_sub_widget: bool = False,
     ) -> None:
         """Initialize common widget state.
 
@@ -104,7 +104,7 @@ class WidgetBase(ABC):
             y: Y-coordinate of the widget's top-left corner.
             width: Widget width.
             height: Widget height.
-            isSubWidget: Whether this widget is owned and drawn by another
+            is_sub_widget: Whether this widget is owned and drawn by another
                 widget instead of being managed directly by ``WidgetHandler``.
         """
         self.win = win
@@ -112,12 +112,12 @@ class WidgetBase(ABC):
         self._y = y
         self._width = width
         self._height = height
-        self._isSubWidget = isSubWidget
+        self._isSubWidget = is_sub_widget
 
         self._hidden = False
         self._disabled = False
 
-        if not isSubWidget:
+        if not is_sub_widget:
             WidgetHandler.addWidget(self)
 
     @abstractmethod
@@ -167,7 +167,7 @@ class WidgetBase(ABC):
         """Allow the widget to handle input."""
         self._disabled = False
 
-    def isSubWidget(self) -> bool:
+    def is_sub_widget(self) -> bool:
         """Return whether this widget is managed by a parent widget."""
         return self._isSubWidget
 
@@ -270,10 +270,10 @@ class WidgetBase(ABC):
         """Set the widget height."""
         self._height = height
 
-    def setIsSubWidget(self, isSubWidget: bool) -> None:
+    def setIsSubWidget(self, is_sub_widget: bool) -> None:
         """Update sub-widget ownership and global handler registration."""
-        self._isSubWidget = isSubWidget
-        if isSubWidget:
+        self._isSubWidget = is_sub_widget
+        if is_sub_widget:
             WidgetHandler.removeWidget(self)
         else:
             WidgetHandler.addWidget(self)

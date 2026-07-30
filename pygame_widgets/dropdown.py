@@ -1,15 +1,16 @@
 import pygame
 
 import pygame_widgets
-from pygame_widgets.widget import WidgetBase
 from pygame_widgets.mouse import Mouse, MouseState
+from pygame_widgets.widget import WidgetBase
 
 
 class Dropdown(WidgetBase):
     def __init__(
-        self, win, x, y, width, height, name, choices, isSubWidget=False, **kwargs
+        self, win, x, y, width, height, name, choices, is_sub_widget=False, **kwargs
     ):
-        super().__init__(win, x, y, width, height, isSubWidget)
+        super().__init__(win, x, y, width, height, is_sub_widget)
+
         self._dropped = False
         self.__chosen = None
 
@@ -64,10 +65,10 @@ class Dropdown(WidgetBase):
         )
 
         # Function
-        self.onClick = kwargs.get("onClick", lambda *args: None)
-        self.onRelease = kwargs.get("onRelease", lambda *args: None)
-        self.onClickParams = kwargs.get("onClickParams", ())
-        self.onReleaseParams = kwargs.get("onReleaseParams", ())
+        self.on_click = kwargs.get("on_click", lambda *args: None)
+        self.on_release = kwargs.get("on_release", lambda *args: None)
+        self.on_click_params = kwargs.get("on_click_params", ())
+        self.on_release_params = kwargs.get("on_release_params", ())
 
     def listen(self, events):
         """Wait for input
@@ -76,15 +77,15 @@ class Dropdown(WidgetBase):
         :type events: list of pygame.event.Event
         """
         if not self._hidden and not self._disabled:
-            mouseState = Mouse.getMouseState()
+            mouse_state = Mouse.getMouseState()
             x, y = Mouse.getMousePos()
 
             if self.contains(x, y):
-                if mouseState == MouseState.CLICK:
-                    self.onClick(*self.onClickParams)
+                if mouse_state == MouseState.CLICK:
+                    self.on_click(*self.on_click_params)
 
-                elif mouseState == MouseState.RELEASE:
-                    self.onRelease(*self.onReleaseParams)
+                elif mouse_state == MouseState.RELEASE:
+                    self.on_release(*self.on_release_params)
 
             # Then we handle the DropdownChoices
             self.__main.listen(events)
@@ -105,10 +106,10 @@ class Dropdown(WidgetBase):
     def reset(self):
         self.__chosen = None
 
-    def getSelected(self):
+    def get_selected(self):
         return self.__chosen._value if self.__chosen is not None else None
 
-    def toggleDropped(self):
+    def toggle_dropped(self):
         self._dropped = not self._dropped
         if self._dropped:
             for c in self.__choices:
@@ -118,7 +119,7 @@ class Dropdown(WidgetBase):
             for c in self.__choices:
                 c.hide()
 
-    def isDropped(self):
+    def is_dropped(self):
         return self._dropped
 
     @property
@@ -126,69 +127,61 @@ class Dropdown(WidgetBase):
         return self.__chosen
 
     @chosen.setter
-    def chosen(self, newChosen):
-        if isinstance(newChosen, DropdownChoice):
-            self.__chosen = newChosen
+    def chosen(self, new_chosen):
+        if isinstance(new_chosen, DropdownChoice):
+            self.__chosen = new_chosen
         else:
             raise TypeError(
                 "Wrong type for 'chosen' property, DropdownChoice is expected"
             )
 
-    def setDropped(self, drop):
+    def set_dropped(self, drop):
         if drop != self._dropped:
-            self.toggleDropped()
+            self.toggle_dropped()
 
-    def setX(self, x):
+    def set_x(self, x):
         self._x = x
         for i, c in enumerate(self.__choices):
-            if c.direction == "down":
-                c._x = 0
-            elif c.direction == "up":
+            if c.direction == "down" or c.direction == "up":
                 c._x = 0
             elif c.direction == "right":
                 c._x = (i + 1) * c.getWidth()
             elif c.direction == "left":
                 c._x = -(i + 1) * c.getWidth()
 
-    def setY(self, y):
+    def set_y(self, y):
         self._y = y
         for i, c in enumerate(self.__choices):
             if c.direction == "down":
                 c._y = (i + 1) * c.getHeight()
             elif c.direction == "up":
                 c._y = -(i + 1) * c.getHeight()
-            elif c.direction == "right":
-                c._y = 0
-            elif c.direction == "left":
+            elif c.direction == "right" or c.direction == "left":
                 c._y = 0
 
-    def setWidth(self, width):
+    def set_width(self, width):
         self._width = width
         for i, c in enumerate(self.__choices):
-            c.setWidth(width)
-            if c.direction == "down":
-                c._x = 0
-            elif c.direction == "up":
+            c.set_width(width)
+            if c.direction == "down" or c.direction == "up":
                 c._x = 0
             elif c.direction == "right":
                 c._x = (i + 1) * c.getWidth()
             elif c.direction == "left":
                 c._x = -(i + 1) * c.getWidth()
-        self.__main.setWidth(width)
+        self.__main.set_width(width)
 
-    def setHeight(self, height):
+    def set_height(self, height):
         self._height = height
         for i, c in enumerate(self.__choices):
-            c.setHeight(height)
+            c.set_height(height)
             if c.direction == "down":
                 c._y = (i + 1) * c.getHeight()
             elif c.direction == "up":
                 c._y = -(i + 1) * c.getHeight()
-            elif c.direction == "right":
+            elif c.direction == "right" or c.direction == "left":
                 c._y = 0
-            elif c.direction == "left":
-                c._y = 0
-        self.__main.setHeight(height)
+        self.__main.set_height(height)
 
 
 class DropdownChoice(WidgetBase):
@@ -204,34 +197,36 @@ class DropdownChoice(WidgetBase):
         last: bool,
         **kwargs,
     ):
-        super().__init__(win, x, y, width, height, isSubWidget=True)
+        super().__init__(win, x, y, width, height, is_sub_widget=True)
 
         self.__text = text
 
         self._dropdown = dropdown
         self._value = kwargs.get("value", text)
         # Border
-        self.borderThickness = kwargs.get("borderThickness", 3)
-        self.borderColour = kwargs.get("borderColour", (0, 0, 0))
-        self.borderRadius = kwargs.get("borderRadius", 0)
+        self.border_thickness = kwargs.get("border_thickness", 3)
+        self.border_colour = kwargs.get("border_colour", (0, 0, 0))
+        self.border_radius = kwargs.get("border_radius", 0)
 
         # Colour
-        self.inactiveColour = kwargs.get("inactiveColour", (150, 150, 150))
-        self.hoverColour = kwargs.get("hoverColour", (125, 125, 125))
-        self.pressedColour = kwargs.get("pressedColour", (100, 100, 100))
+        self.inactive_colour = kwargs.get("inactive_colour", (150, 150, 150))
+        self.hover_colour = kwargs.get("hover_colour", (125, 125, 125))
+        self.pressed_colour = kwargs.get("pressed_colour", (100, 100, 100))
         self.colour = kwargs.get(
-            "colour", self.inactiveColour
-        )  # Allows colour to override inactiveColour
-        self.inactiveColour = self.colour
+            "colour", self.inactive_colour
+        )  # Allows colour to override inactive_colour
+        self.inactive_colour = self.colour
 
         # Text
-        self.textColour = kwargs.get("textColour", (0, 0, 0))
-        self.fontSize = kwargs.get("fontSize", 20)
-        self.font = kwargs.get("font", pygame.font.SysFont("sans-serif", self.fontSize))
-        self.textHAlign = kwargs.get("textHAlign", "centre")
+        self.text_colour = kwargs.get("text_colour", (0, 0, 0))
+        self.font_size = kwargs.get("font_size", 20)
+        self.font = kwargs.get(
+            "font", pygame.font.SysFont("sans-serif", self.font_size)
+        )
+        self.text_horizontal_align = kwargs.get("text_horizontal_align", "centre")
 
-        self.textOffsetLeft = self.fontSize // 5
-        self.textOffsetRight = self.fontSize // 5
+        self.text_offset_left = self.font_size // 5
+        self.text_offset_right = self.font_size // 5
 
         # action
         self.clicked = False
@@ -242,39 +237,41 @@ class DropdownChoice(WidgetBase):
     def draw(self):
         if not self._hidden:
             rect = pygame.Rect(
-                self.computedX,
-                self.computedY,
+                self.computed_x,
+                self.computed_y,
                 self._width,
                 self._height,
             )
-            pygame.draw.rect(self.win, self.colour, rect, **self._computeBorderRadii())
+            pygame.draw.rect(
+                self.win, self.colour, rect, **self._compute_border_radii()
+            )
 
-            text_rendered = self.font.render(self.text, True, self.textColour)
+            text_rendered = self.font.render(self.text, True, self.text_colour)
 
-            if self.textHAlign == "centre":
+            if self.text_horizontal_align == "centre":
                 text_rect = text_rendered.get_rect(
                     center=(
-                        self.computedX + self._width // 2,
-                        self.computedY + self._height // 2,
+                        self.computed_x + self._width // 2,
+                        self.computed_y + self._height // 2,
                     )
                 )
-            elif self.textHAlign == "left":
+            elif self.text_horizontal_align == "left":
                 text_rect = text_rendered.get_rect(
                     center=(
-                        self.computedX
+                        self.computed_x
                         + text_rendered.get_width() // 2
-                        + self.textOffsetLeft,
-                        self.computedY + self._height // 2,
+                        + self.text_offset_left,
+                        self.computed_y + self._height // 2,
                     )
                 )
-            elif self.textHAlign == "right":
+            elif self.text_horizontal_align == "right":
                 text_rect = text_rendered.get_rect(
                     center=(
-                        self.computedX
+                        self.computed_x
                         - text_rendered.get_width() // 2
                         + self._width
-                        - self.textOffsetRight,
-                        self.computedY + self._height // 2,
+                        - self.text_offset_right,
+                        self.computed_y + self._height // 2,
                     )
                 )
 
@@ -287,56 +284,56 @@ class DropdownChoice(WidgetBase):
         :type events: list of pygame.event.Event
         """
         if not self._hidden and not self._disabled:
-            mouseState = Mouse.getMouseState()
+            mouse_state = Mouse.getMouseState()
             x, y = Mouse.getMousePos()
 
             if self.contains(x, y):
-                if mouseState == MouseState.RELEASE and self.clicked:
+                if mouse_state == MouseState.RELEASE and self.clicked:
                     self.clicked = False
-                    self._dropdown.setDropped(False)
+                    self._dropdown.set_dropped(False)
                     self._dropdown.chosen = self
 
-                elif mouseState == MouseState.CLICK:
+                elif mouse_state == MouseState.CLICK:
                     self.clicked = True
-                    self.colour = self.pressedColour
+                    self.colour = self.pressed_colour
 
-                elif mouseState == MouseState.DRAG and self.clicked:
-                    self.colour = self.pressedColour
+                elif mouse_state == MouseState.DRAG and self.clicked:
+                    self.colour = self.pressed_colour
 
-                elif mouseState == MouseState.HOVER or mouseState == MouseState.DRAG:
-                    self.colour = self.hoverColour
+                elif mouse_state == MouseState.HOVER or mouse_state == MouseState.DRAG:
+                    self.colour = self.hover_colour
 
             else:
                 self.clicked = False
-                self.colour = self.inactiveColour
+                self.colour = self.inactive_colour
 
     def contains(self, x, y) -> bool:
         return (
-            self.computedX < x < self.computedX + self._width
-            and self.computedY < y < self.computedY + self._height
+            self.computed_x < x < self.computed_x + self._width
+            and self.computed_y < y < self.computed_y + self._height
         )
 
-    def _computeBorderRadii(self):
-        borderRadius = {}
+    def _compute_border_radii(self):
+        border_radius = {}
         if not self.last:
-            return borderRadius
+            return border_radius
         if self.direction == "up":
-            borderRadius["border_top_left_radius"] = self.borderRadius
-            borderRadius["border_top_right_radius"] = self.borderRadius
+            border_radius["border_top_left_radius"] = self.border_radius
+            border_radius["border_top_right_radius"] = self.border_radius
 
         elif self.direction == "down":
-            borderRadius["border_bottom_left_radius"] = self.borderRadius
-            borderRadius["border_bottom_right_radius"] = self.borderRadius
+            border_radius["border_bottom_left_radius"] = self.border_radius
+            border_radius["border_bottom_right_radius"] = self.border_radius
 
         elif self.direction == "right":
-            borderRadius["border_top_right_radius"] = self.borderRadius
-            borderRadius["border_bottom_right_radius"] = self.borderRadius
+            border_radius["border_top_right_radius"] = self.border_radius
+            border_radius["border_bottom_right_radius"] = self.border_radius
 
         elif self.direction == "left":
-            borderRadius["border_top_left_radius"] = self.borderRadius
-            borderRadius["border_bottom_left_radius"] = self.borderRadius
+            border_radius["border_top_left_radius"] = self.border_radius
+            border_radius["border_bottom_left_radius"] = self.border_radius
 
-        return borderRadius
+        return border_radius
 
     @property
     def text(self):
@@ -365,18 +362,18 @@ class DropdownChoice(WidgetBase):
             raise TypeError("Wrong type for 'last' property, boolean is expected")
 
     @direction.setter
-    def direction(self, newDirection):
-        if isinstance(newDirection, str):
-            self.__direction = newDirection
+    def direction(self, new_direction):
+        if isinstance(new_direction, str):
+            self.__direction = new_direction
         else:
             raise TypeError("Wrong type for 'direction' property, str is expected")
 
     @property
-    def computedX(self):
+    def computed_x(self):
         return self._dropdown.getX() + self._x
 
     @property
-    def computedY(self):
+    def computed_y(self):
         return self._dropdown.getY() + self._y
 
 
@@ -392,57 +389,57 @@ class HeadDropdown(DropdownChoice):
         :type events: list of pygame.event.Event
         """
         if not self._hidden and not self._disabled:
-            mouseState = Mouse.getMouseState()
+            mouse_state = Mouse.getMouseState()
             x, y = Mouse.getMousePos()
 
             if self.contains(x, y):
-                if mouseState == MouseState.CLICK:
+                if mouse_state == MouseState.CLICK:
                     self.clicked = True
-                    self._dropdown.toggleDropped()
+                    self._dropdown.toggle_dropped()
 
-                elif mouseState == MouseState.DRAG and self.clicked:
-                    self.colour = self.pressedColour
+                elif mouse_state == MouseState.DRAG and self.clicked:
+                    self.colour = self.pressed_colour
 
-                elif mouseState == MouseState.RELEASE:
+                elif mouse_state == MouseState.RELEASE:
                     self.clicked = False
 
-                elif mouseState == MouseState.HOVER or mouseState == MouseState.DRAG:
-                    self.colour = self.hoverColour
+                elif mouse_state == MouseState.HOVER or mouse_state == MouseState.DRAG:
+                    self.colour = self.hover_colour
 
-                elif mouseState == MouseState.RIGHT_CLICK:
+                elif mouse_state == MouseState.RIGHT_CLICK:
                     self._dropdown.reset()
 
             else:
                 self.clicked = False
-                self.colour = self.inactiveColour
+                self.colour = self.inactive_colour
 
-    def _computeBorderRadii(self):
-        borderRadius = {}
+    def _compute_border_radii(self):
+        border_radius = {}
         if not self.last:
-            return borderRadius
-        if self._dropdown.isDropped():
+            return border_radius
+        if self._dropdown.is_dropped():
             if self.direction == "up":
-                borderRadius["border_bottom_left_radius"] = self.borderRadius
-                borderRadius["border_bottom_right_radius"] = self.borderRadius
+                border_radius["border_bottom_left_radius"] = self.border_radius
+                border_radius["border_bottom_right_radius"] = self.border_radius
 
             elif self.direction == "down":
-                borderRadius["border_top_left_radius"] = self.borderRadius
-                borderRadius["border_top_right_radius"] = self.borderRadius
+                border_radius["border_top_left_radius"] = self.border_radius
+                border_radius["border_top_right_radius"] = self.border_radius
 
             elif self.direction == "left":
-                borderRadius["border_top_right_radius"] = self.borderRadius
-                borderRadius["border_bottom_right_radius"] = self.borderRadius
+                border_radius["border_top_right_radius"] = self.border_radius
+                border_radius["border_bottom_right_radius"] = self.border_radius
 
             elif self.direction == "right":
-                borderRadius["border_top_left_radius"] = self.borderRadius
-                borderRadius["border_bottom_left_radius"] = self.borderRadius
+                border_radius["border_top_left_radius"] = self.border_radius
+                border_radius["border_bottom_left_radius"] = self.border_radius
         else:
-            borderRadius["border_top_left_radius"] = self.borderRadius
-            borderRadius["border_bottom_left_radius"] = self.borderRadius
-            borderRadius["border_top_right_radius"] = self.borderRadius
-            borderRadius["border_bottom_right_radius"] = self.borderRadius
+            border_radius["border_top_left_radius"] = self.border_radius
+            border_radius["border_bottom_left_radius"] = self.border_radius
+            border_radius["border_top_right_radius"] = self.border_radius
+            border_radius["border_bottom_right_radius"] = self.border_radius
 
-        return borderRadius
+        return border_radius
 
     @property
     def text(self):
@@ -454,6 +451,8 @@ class HeadDropdown(DropdownChoice):
 
 
 if __name__ == "__main__":
+    import sys
+
     from pygame_widgets.button import Button
 
     pygame.init()
@@ -469,14 +468,14 @@ if __name__ == "__main__":
         name="Select Colour",
         choices=["Red", "Blue", "Yellow"],
         colour=(200, 0, 0),
-        borderRadius=3,
+        border_radius=3,
         values=[1, 2, "true"],
         direction="down",
-        textHAlign="left",
+        text_horizontal_align="left",
     )
 
     def printValue():
-        print(dropdown.getSelected())
+        print(dropdown.get_selected())
 
     button = Button(
         win,
@@ -485,14 +484,14 @@ if __name__ == "__main__":
         100,
         50,
         text="Print Value",
-        fontSize=30,
+        font_size=30,
         margin=20,
-        inactiveColour=(255, 0, 0),
-        pressedColour=(0, 255, 0),
+        inactive_colour=(255, 0, 0),
+        pressed_colour=(0, 255, 0),
         radius=5,
-        onClick=printValue,
+        on_click=printValue,
         font=pygame.font.SysFont("calibri", 10),
-        textVAlign="bottom",
+        text_vertical_align="bottom",
     )
 
     run = True
@@ -502,7 +501,7 @@ if __name__ == "__main__":
             if event.type == pygame.QUIT:
                 pygame.quit()
                 run = False
-                quit()
+                sys.exit()
 
         win.fill((255, 255, 255))
 

@@ -1,11 +1,13 @@
 import pygame_widgets
-from pygame_widgets.widget import WidgetBase
-from pygame_widgets.textbox import TextBox
 from pygame_widgets.dropdown import Dropdown, DropdownChoice
+from pygame_widgets.textbox import TextBox
+from pygame_widgets.widget import WidgetBase
 
 
 class ComboBox(Dropdown):
-    def __init__(self, win, x, y, width, height, choices, textboxKwargs=None, **kwargs):
+    def __init__(
+        self, win, x, y, width, height, choices, textbox_kwargs=None, **kwargs
+    ):
         """Initialise a customisable combo box for Pygame. Acts like a searchable dropdown.
 
         :param win: Surface on which to draw
@@ -20,61 +22,61 @@ class ComboBox(Dropdown):
         :type height: int
         :param choices: Possible search values
         :type choices: list(str)
-        :param textboxKwargs: Kwargs to be passed to the search box
-        :type textboxKwargs: dict(str: Any)
-        :param maxResults: The maximum number of results to display
-        :type maxResults: int
+        :param textbox_kwargs: Kwargs to be passed to the search box
+        :type textbox_kwargs: dict(str: Any)
+        :param max_results: The maximum number of results to display
+        :type max_results: int
         :param kwargs: Optional parameters
         """
         WidgetBase.__init__(self, win, x, y, width, height)
 
-        if textboxKwargs is None:
-            textboxKwargs = {}
+        if textbox_kwargs is None:
+            textbox_kwargs = {}
         self._dropped = False
 
         self.choices = choices
         self.suggestions = choices  # Stores the current suggestions
 
-        self._searchAlgo = kwargs.get("searchAlgo", self._defaultSearch)
+        self._search_algo = kwargs.get("search_algo", self._default_search)
 
         # Adds params that are not specified in text box
         for key, value in kwargs.items():
-            if key not in textboxKwargs:
-                textboxKwargs[key] = value
+            if key not in textbox_kwargs:
+                textbox_kwargs[key] = value
 
-        self.textBar = TextBox(
+        self.text_bar = TextBox(
             win,
             x,
             y,
             width,
             height,
-            isSubWidget=True,
-            onTextChanged=self.updateSearchResults,
-            **textboxKwargs,
+            is_sub_widget=True,
+            on_text_changed=self.update_search_results,
+            **textbox_kwargs,
         )
-        self.__main = self.textBar
+        self.__main = self.text_bar
         # Set the number of choices if not given
-        self.maxResults = kwargs.get("maxResults", len(choices))
+        self.max_results = kwargs.get("max_results", len(choices))
 
-        self.createDropdownChoices(x, y, width, height, **kwargs)
+        self.create_dropdown_choices(x, y, width, height, **kwargs)
 
-        self.getText = self.textBar.getText
+        self.get_text = self.text_bar.get_text
 
-        # Function
-        self.onSelected = kwargs.get("onSelected", lambda *args: None)
-        self.onSelectedParams = kwargs.get("onSelectedParams", ())
-        self.onStartSearch = kwargs.get("onStartSearch", lambda *args: None)
-        self.onStartSearchParams = kwargs.get("onStartSearchParams", ())
-        self.onStopSearch = kwargs.get("onStopSearch", lambda *args: None)
-        self.onStopSearchParams = kwargs.get("onStopSearchParams", ())
+        # Function``
+        self.on_selected = kwargs.get("on_selected", lambda *args: None)
+        self.on_selected_params = kwargs.get("on_selected_params", ())
+        self.on_start_search = kwargs.get("on_start_search", lambda *args: None)
+        self.on_start_search_params = kwargs.get("on_start_search_params", ())
+        self.on_stop_search = kwargs.get("on_stop_search", lambda *args: None)
+        self.on_stop_search_params = kwargs.get("on_stop_search_params", ())
 
-    def createDropdownChoices(self, x, y, width, height, **kwargs):
+    def create_dropdown_choices(self, x, y, width, height, **kwargs):
         """Create the widgets for the choices."""
         # We create the DropdownChoice(s)
         direction = kwargs.get("direction", "down")
         self.__choices = []
         for i, text in enumerate(self.choices):
-            if i == self.maxResults:
+            if i == self.max_results:
                 return
 
             if direction == "down":
@@ -103,7 +105,7 @@ class ComboBox(Dropdown):
                     text=text,
                     dropdown=self,
                     value=i,
-                    last=(i == self.maxResults - 1),
+                    last=(i == self.max_results - 1),
                     **kwargs,
                 )
             )
@@ -116,80 +118,80 @@ class ComboBox(Dropdown):
         """
         if not self._hidden and not self._disabled:
             # Keeps state of selected
-            previouslySelected = self.textBar.selected
-            self.textBar.listen(events)
+            previously_selected = self.text_bar.selected
+            self.text_bar.listen(events)
 
             if self._dropped:
-                for dropdownChoice in self.__choices:
-                    dropdownChoice.listen(events)
-                    if dropdownChoice.clicked:
+                for dropdown_choice in self.__choices:
+                    dropdown_choice.listen(events)
+                    if dropdown_choice.clicked:
                         # The choice was clicked by user
-                        self.textBar.setText(dropdownChoice.text)
+                        self.text_bar.set_text(dropdown_choice.text)
                         # TODO
-                        # Если написать какой нибудь цвет,
-                        # потом выбрать его из выпадающего меню,
-                        # затем кликнуть два раза (double click) по textbox,
-                        # то у меня блокируются какие либо действия в самом textbox,
-                        # хотя курсор горит, что говорит об активности виджета.
-                        # Но стоит мне два раза нажать backspace - все действия становятся доступны.
-                        # И срабатывает это как бутдто не всегда.
-                        # Честно говоря, понятия не имею где может быть ошибка.
-                        # Не ясно даже кто виноват: combobox или textbox
-                        self.onSelected(*self.onSelectedParams)
+                        # If you write some color,
+                        # then select it from the drop-down menu,
+                        # then double-click on the textbox,
+                        # then I have blocked any actions in the textbox itself,
+                        # although the cursor is lit, which indicates that the widget is active.
+                        # But as soon as I press backspace twice, all the actions become available.
+                        # And it doesn't always work like that.
+                        # To be honest, I have no idea where the error might be.
+                        # It's not even clear who's to blame: combobox or textbox
+                        self.on_selected(*self.on_selected_params)
 
             # Whether the search is started or stopped
-            if previouslySelected and not self.textBar.selected:
-                self.onStopSearch(*self.onStopSearchParams)
+            if previously_selected and not self.text_bar.selected:
+                self.on_stop_search(*self.on_stop_search_params)
                 self._dropped = False
 
-            if not previouslySelected and self.textBar.selected:
-                self.onStartSearch(*self.onStartSearchParams)
-                self.updateSearchResults()
+            if not previously_selected and self.text_bar.selected:
+                self.on_start_search(*self.on_start_search_params)
+                self.update_search_results()
 
     def draw(self):
         """Draw the widget."""
         if not self._hidden:
-            self.textBar.draw()
+            self.text_bar.draw()
             if self._dropped:
                 # Find how many choices should be shown
-                numberVisible = min(len(self.suggestions), self.maxResults)
-                for i, dropdownChoice in enumerate(self.__choices):
+                number_visible = min(len(self.suggestions), self.max_results)
+                for i, dropdown_choice in enumerate(self.__choices):
                     # Define if the the dropdown should be shown
-                    if i < numberVisible:
-                        dropdownChoice.show()
+                    if i < number_visible:
+                        dropdown_choice.show()
                         self.moveToTop()
                         # Choose the text to show
-                        dropdownChoice.text = self.suggestions[i]
+                        dropdown_choice.text = self.suggestions[i]
                     else:
-                        dropdownChoice.hide()
-                    dropdownChoice.draw()
+                        dropdown_choice.hide()
+                    dropdown_choice.draw()
 
     def contains(self, x, y):
         return super(Dropdown, self).contains(x, y) or (
             any([c.contains(x, y) for c in self.__choices]) and self._dropped
         )
 
-    def updateSearchResults(self):
+    def update_search_results(self):
         """Update the suggested results based on selected text.
 
         Uses a 'contains' research. Could be improved by other
         search algorithms.
         """
-        text = self.textBar.getText()
+        text = self.text_bar.get_text()
 
         if text != "":
             # Finds all the texts that start with the same text
-            self.suggestions = self._searchAlgo(text, self.choices)
+            self.suggestions = self._search_algo(text, self.choices)
             self._dropped = True
         else:
             self._dropped = False
 
-    def _searchAlgo(self, text, choices):
+    def _search_algo(self, text, choices):
         """Return the suggestions of text in choices."""
         raise NotImplementedError("A search method must override this.")
 
     @staticmethod
-    def _defaultSearch(text, choices):
+    def _default_search(text, choices):
         """Return the suggestions of text in choices."""
 
         # First add the ones that perfectly match case
@@ -202,13 +204,16 @@ class ComboBox(Dropdown):
 
 
 if __name__ == "__main__":
+    import sys
+
     import pygame
+
     from pygame_widgets.button import Button
 
     pygame.init()
     win = pygame.display.set_mode((600, 600))
 
-    comboBox = ComboBox(
+    combo_box = ComboBox(
         win,
         120,
         10,
@@ -216,16 +221,16 @@ if __name__ == "__main__":
         50,
         name="Select Colour",
         choices=pygame.colordict.THECOLORS.keys(),
-        maxResults=4,
+        max_results=4,
         font=pygame.font.SysFont("calibri", 30),
-        borderRadius=3,
+        border_radius=3,
         colour=(0, 200, 50),
         direction="down",
-        textHAlign="left",
+        text_horizontal_align="left",
     )
 
     def output():
-        comboBox.textBar.colour = comboBox.getText()
+        combo_box.text_bar.colour = combo_box.get_text()
 
     button = Button(
         win,
@@ -234,14 +239,14 @@ if __name__ == "__main__":
         100,
         50,
         text="Set Colour",
-        fontSize=30,
+        font_size=30,
         margin=15,
-        inactiveColour=(200, 0, 100),
-        pressedColour=(0, 255, 0),
+        inactive_colour=(200, 0, 100),
+        pressed_colour=(0, 255, 0),
         radius=5,
-        onClick=output,
+        on_click=output,
         font=pygame.font.SysFont("calibri", 18),
-        textVAlign="bottom",
+        text_vertical_align="bottom",
     )
 
     run = True
@@ -251,7 +256,7 @@ if __name__ == "__main__":
             if event.type == pygame.QUIT:
                 pygame.quit()
                 run = False
-                quit()
+                sys.exit()
 
         win.fill((255, 255, 255))
 
