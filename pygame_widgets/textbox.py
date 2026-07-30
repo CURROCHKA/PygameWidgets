@@ -338,7 +338,11 @@ class TextBox(WidgetBase):
         self._draw_cursor()
 
     def _draw_text(self) -> None:
-        # TODO: Fix bug with text_under_selection rendering
+        def draw_segment(
+            text: str, color: ColorLike, x: float, y: float, style: int = 0
+        ):
+            text_surface = self.get_rendered_text_surface(text, color, style)
+            self.win.blit(text_surface, (x, y))
 
         if self.is_empty_text(self.text):
             display_lines = [
@@ -366,58 +370,51 @@ class TextBox(WidgetBase):
         ):
             visual_line = display_lines[i]
 
+            text = visual_line.text
+            line_index = visual_line.line_index
+            line_start = visual_line.start_at
+
             line_y = (
                 self._actual_y + (i - self.first_visible_line_index) * self.line_height
             )
 
-            if (
-                self.is_empty_selection()
-                or not start.line <= visual_line.line_index <= end.line
-            ):
-                text_surface = self.get_rendered_text_surface(visual_line.text, color)
-                self.win.blit(text_surface, (self._actual_x, line_y))
+            if self.is_empty_selection() or not start.line <= line_index <= end.line:
+                draw_segment(text, color, self._actual_x, line_y)
 
             else:
-                start_column = (
-                    start.column if visual_line.line_index == start.line else 0
-                )
+                start_column = start.column if line_index == start.line else 0
                 end_column = (
-                    end.column
-                    if visual_line.line_index == end.line
-                    else len(self.text[visual_line.line_index])
+                    end.column if line_index == end.line else len(self.text[line_index])
                 )
 
-                local_start = max(0, start_column - visual_line.start_at)
-                local_end = min(
-                    len(visual_line.text), end_column - visual_line.start_at
-                )
+                local_start = max(0, start_column - line_start)
+                local_end = min(len(text), end_column - line_start)
+                
+                if local_start > local_end:
+                    draw_segment(text, color, self._actual_x, line_y)
+                    continue
 
-                text_before_selection = visual_line.text[:local_start]
-                text_under_selection = visual_line.text[local_start:local_end]
-                text_after_selection = visual_line.text[local_end:]
+                text_before_selection = text[:local_start]
+                text_under_selection = text[local_start:local_end]
+                text_after_selection = text[local_end:]
 
                 if text_before_selection:
-                    text_surface = self.get_rendered_text_surface(
-                        text_before_selection, color
-                    )
-                    self.win.blit(text_surface, (self._actual_x, line_y))
+                    draw_segment(text_before_selection, color, self._actual_x, line_y)
 
                 if text_under_selection:
-                    text_surface = self.get_rendered_text_surface(
-                        text_under_selection, self.style.text_color_under_selection
-                    )
-                    self.win.blit(
-                        text_surface,
-                        (self._actual_x + visual_line.get_offset(local_start), line_y),
+                    draw_segment(
+                        text_under_selection,
+                        self.style.text_color_under_selection,
+                        self._actual_x + visual_line.get_offset(local_start),
+                        line_y,
                     )
 
                 if text_after_selection:
-                    text_surface = self.get_rendered_text_surface(
-                        text_after_selection, color
-                    )
-                    self.win.blit(
-                        text_surface,
-                        (self._actual_x + visual_line.get_offset(local_end), line_y),
+                    draw_segment(
+                        text_after_selection,
+                        color,
+                        self._actual_x + visual_line.get_offset(local_end),
+                        line_y,
                     )
 
     def _draw_cursor(self) -> None:
@@ -500,7 +497,9 @@ class TextBox(WidgetBase):
         ):
             visual_line = self.cached_visual_lines[i]
 
+            text = visual_line.text
             line_index = visual_line.line_index
+            line_start = visual_line.start_at
 
             if not (start.line <= line_index <= end.line):
                 continue
@@ -509,15 +508,13 @@ class TextBox(WidgetBase):
                 i - self.first_visible_line_index
             )
 
-            line_start = visual_line.start_at
-
-            selection_start = start.column if line_index == start.line else 0
-            selection_end = (
+            start_column = start.column if line_index == start.line else 0
+            end_column = (
                 end.column if line_index == end.line else len(self.text[line_index])
             )
 
-            local_start = max(0, selection_start - line_start)
-            local_end = min(len(visual_line.text), selection_end - line_start)
+            local_start = max(0, start_column - line_start)
+            local_end = min(len(text), end_column - line_start)
 
             if local_start > local_end:
                 continue
@@ -526,9 +523,8 @@ class TextBox(WidgetBase):
 
             is_end_of_logical_line = (
                 line_index < end.line
-                and local_end == len(visual_line.text)
-                and visual_line.start_at + len(visual_line.text)
-                == len(self.text[line_index])
+                and local_end == len(text)
+                and line_start + len(text) == len(self.text[line_index])
             )
 
             if local_start == local_end and not (
@@ -555,7 +551,7 @@ class TextBox(WidgetBase):
                 ),
             )
 
-    def process_mouse_click(self, x: int, y: int) -> None:
+    def process_mouse_click(self, x: float, y: float) -> None:
         if self.contains(x, y):
             now = pygame.time.get_ticks()
             self.last_click_time = now
@@ -570,7 +566,7 @@ class TextBox(WidgetBase):
         else:
             self.escape()
 
-    def process_mouse_drag(self, x: int, y: int) -> None:
+    def process_mouse_drag(self, x: float, y: float) -> None:
         self.cursor_time = pygame.time.get_ticks()
         self.set_cursor_from_mouse(x, y)
         self.selection_end.set(self.cursor.line, self.cursor.column, self.text)
@@ -1275,7 +1271,7 @@ class TextBox(WidgetBase):
 
         self.cursor.set(line, column, self.text)
 
-    def set_cursor_from_mouse(self, mouse_x: int, mouse_y: int) -> None:
+    def set_cursor_from_mouse(self, mouse_x: float, mouse_y: float) -> None:
         """Move the cursor to the text position closest to a mouse coordinate.
 
         The y coordinate selects a visible ``VisualLine`` after clamping to the
