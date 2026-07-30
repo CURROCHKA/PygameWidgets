@@ -115,6 +115,7 @@ class TextBox(WidgetBase):
         is_sub_widget=False,
         **kwargs,
     ) -> None:
+        # TODO: make text alignment
         super().__init__(win, x, y, width, height, is_sub_widget)
 
         if not pygame.get_init():

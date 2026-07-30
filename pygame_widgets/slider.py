@@ -1,33 +1,33 @@
+import math
 from dataclasses import dataclass, replace
 
 import pygame
-import math
 
 import pygame_widgets
-from pygame_widgets.widget import WidgetBase
 from pygame_widgets.mouse import Mouse, MouseState
+from pygame_widgets.widget import WidgetBase
 
 
 @dataclass
 class SliderStyle:
-    colour: tuple[int, int, int] = (200, 200, 200)
-    valueColour: tuple[int, int, int] = (0, 35, 255)
-    handleColour: tuple[int, int, int] = (0, 0, 0)
-    borderThickness: int = 3
-    borderColour: tuple[int, int, int] = (0, 0, 0)
+    color: tuple[int, int, int] = (200, 200, 200)
+    value_color: tuple[int, int, int] = (0, 35, 255)
+    handle_color: tuple[int, int, int] = (0, 0, 0)
+    border_thickness: int = 3
+    border_color: tuple[int, int, int] = (0, 0, 0)
 
     min: float = 0.0
     max: float = 99.0
     step: float = 1.0
 
     curved: bool = True
-    handleCurved: bool = True
+    handle_curved: bool = True
     vertical: bool = False
-    draggableAnywhere: bool = True
+    draggable_anywhere: bool = True
 
     radius: int | None = None
-    handleRadius: int | None = None
-    handleBorderRadius: int | None = None
+    handle_radius: int | None = None
+    handle_border_radius: int | None = None
 
 
 class Slider(WidgetBase):
@@ -45,23 +45,23 @@ class Slider(WidgetBase):
 
         self.selected = False
 
-        styleKwargs = {
+        style_kwargs = {
             k: v for k, v in kwargs.items() if k in SliderStyle.__dataclass_fields__
         }
         if style is None:
-            self.style = SliderStyle(**styleKwargs)
+            self.style = SliderStyle(**style_kwargs)
         else:
-            self.style = replace(style, **styleKwargs)
+            self.style = replace(style, **style_kwargs)
 
-        initialValue = kwargs.get("initial", (self.style.max + self.style.min) / 2)
-        self.value = self.round(initialValue)
+        initial_value = kwargs.get("initial", (self.style.max + self.style.min) / 2)
+        self.value = self.round(initial_value)
         self.value = max(min(self.value, self.style.max), self.style.min)
 
         self.radius = 0
-        self.handleRadius = 0
-        self.reconfigureLayout()
+        self.handle_radius = 0
+        self.reconfigure_layout()
 
-    def reconfigureLayout(self) -> None:
+    def reconfigure_layout(self) -> None:
         if self.style.radius is not None:
             self.radius = self.style.radius
 
@@ -73,29 +73,28 @@ class Slider(WidgetBase):
         else:
             self.radius = 0
 
-        if self.style.handleRadius is not None:
-            self.handleRadius = self.style.handleRadius
+        if self.style.handle_radius is not None:
+            self.handle_radius = self.style.handle_radius
         else:
             if self.style.vertical:
-                self.handleRadius = int(self._width / 1.3)
+                self.handle_radius = int(self._width / 1.3)
             else:
-                self.handleRadius = int(self._height / 1.3)
+                self.handle_radius = int(self._height / 1.3)
 
-        if self.style.handleBorderRadius is not None:
-            self.handleBorderRadius = self.style.handleBorderRadius
+        if self.style.handle_border_radius is not None:
+            self.handle_border_radius = self.style.handle_border_radius
         else:
-            self.handleBorderRadius = self.radius
+            self.handle_border_radius = self.radius
 
     def listen(self, events: list[pygame.event.Event]) -> None:
         if not self._hidden and not self._disabled:
-            mouseState = Mouse.get_mouse_state()
+            mouse_state = Mouse.get_mouse_state()
             x, y = Mouse.get_mouse_pos()
 
-            if self.contains(x, y):
-                if mouseState == MouseState.CLICK:
-                    self.selected = True
+            if self.contains(x, y) and mouse_state == MouseState.CLICK:
+                self.selected = True
 
-            if mouseState == MouseState.RELEASE:
+            if mouse_state == MouseState.RELEASE:
                 self.selected = False
 
             if self.selected:
@@ -117,77 +116,80 @@ class Slider(WidgetBase):
 
         pygame.draw.rect(
             self.win,
-            self.style.colour,
+            self.style.color,
             (self._x, self._y, self._width, self._height),
             border_radius=self.radius,
         )
 
-        valueRange = self.style.max - self.style.min
-        if valueRange == 0:
-            valueRange = 1
+        value_range = self.style.max - self.style.min
+        if value_range == 0:
+            value_range = 1
 
         if self.style.vertical:
-            valueHeight = (self.style.max - self.value) / valueRange * self._height
-            clipRect = pygame.Rect(
-                self._x, self._y + valueHeight, self._width, self._height - valueHeight
+            value_height = (self.style.max - self.value) / value_range * self._height
+            clip_rect = pygame.Rect(
+                self._x,
+                self._y + value_height,
+                self._width,
+                self._height - value_height,
             )
-            handleCenter = (self._x + self._width / 2, self._y + valueHeight)
+            handle_center = (self._x + self._width / 2, self._y + value_height)
         else:
-            valueWidth = (self.value - self.style.min) / valueRange * self._width
-            clipRect = pygame.Rect(self._x, self._y, max(0, valueWidth), self._height)
-            handleCenter = (self._x + valueWidth, self._y + self._height / 2)
+            value_width = (self.value - self.style.min) / value_range * self._width
+            clip_rect = pygame.Rect(self._x, self._y, max(0, value_width), self._height)
+            handle_center = (self._x + value_width, self._y + self._height / 2)
 
         old_clip = self.win.get_clip()
-        self.win.set_clip(clipRect)
+        self.win.set_clip(clip_rect)
 
         pygame.draw.rect(
             self.win,
-            self.style.valueColour,
+            self.style.value_color,
             (self._x, self._y, self._width, self._height),
             border_radius=self.radius,
         )
 
         self.win.set_clip(old_clip)
 
-        if self.style.handleCurved:
+        if self.style.handle_curved:
             pygame.draw.aacircle(
-                self.win, self.style.handleColour, handleCenter, self.handleRadius
+                self.win, self.style.handle_color, handle_center, self.handle_radius
             )
         else:
             pygame.draw.rect(
                 self.win,
-                self.style.handleColour,
+                self.style.handle_color,
                 (
-                    handleCenter[0] - self.handleRadius,
-                    handleCenter[1] - self.handleRadius,
-                    self.handleRadius * 2,
-                    self.handleRadius * 2,
+                    handle_center[0] - self.handle_radius,
+                    handle_center[1] - self.handle_radius,
+                    self.handle_radius * 2,
+                    self.handle_radius * 2,
                 ),
-                border_radius=self.handleBorderRadius,
+                border_radius=self.handle_border_radius,
             )
 
     def contains(self, x: int, y: int) -> bool:
         if self.style.vertical:
-            handleX = self._x + self._width // 2
-            handleY = int(
+            handle_x = self._x + self._width // 2
+            handle_y = int(
                 self._y
                 + (self.style.max - self.value)
                 / (self.style.max - self.style.min)
                 * self._height
             )
         else:
-            handleX = int(
+            handle_x = int(
                 self._x
                 + (self.value - self.style.min)
                 / (self.style.max - self.style.min)
                 * self._width
             )
-            handleY = self._y + self._height // 2
+            handle_y = self._y + self._height // 2
 
-        if math.sqrt((handleX - x) ** 2 + (handleY - y) ** 2) <= self.handleRadius:
+        if math.sqrt((handle_x - x) ** 2 + (handle_y - y) ** 2) <= self.handle_radius:
             return True
 
-        if self.style.draggableAnywhere:
+        if self.style.draggable_anywhere:
             return pygame.rect.Rect(
                 self._x, self._y, self._width, self._height
             ).collidepoint(x, y)
@@ -197,44 +199,48 @@ class Slider(WidgetBase):
     def round(self, value: float) -> float:
         return self.style.step * round(value / self.style.step)
 
-    def getValue(self) -> float:
+    def get_value(self) -> float:
         return self.value
 
-    def setValue(self, value: float) -> None:
+    def set_value(self, value: float) -> None:
         self.value = value
 
 
 if __name__ == "__main__":
+    import sys
+
     from pygame_widgets.textbox import TextBox
 
     pygame.init()
     win = pygame.display.set_mode((1000, 600))
 
-    # modernDarkTheme = SliderStyle(
-    #     colour=(240, 240, 240),
-    #     valueColour=(30, 30, 30),
-    #     handleColour=(30, 30, 30),
-    #     borderThickness=3,
-    #     borderColour=(0, 0, 0),
+    # dark_theme = SliderStyle(
+    #     color=(240, 240, 240),
+    #     value_color=(30, 30, 30),
+    #     handle_color=(30, 30, 30),
+    #     border_thickness=3,
+    #     border_color=(0, 0, 0),
     #     min=100,
     #     max=200,
     #     step=1,
     #     curved=True,
-    #     handleCurved=True,
+    #     handle_curved=True,
     #     vertical=False,
-    #     draggableAnywhere=True,
+    #     draggable_anywhere=True,
     # )
 
-    slider = Slider(win, 100, 100, 800, 5, min=100, max=200, step=1, handleRadius=15)
-    # slider = Slider(win, 100, 100, 800, 5, style=modernDarkTheme, handleRadius=15)
+    slider = Slider(win, 100, 100, 800, 5, min=100, max=200, step=1, handle_radius=15)
+    # slider = Slider(win, 100, 100, 800, 5, style=dark_theme, handle_radius=15)
     output = TextBox(win, 475, 200, 100, 50, fontSize=30)
 
-    v_slider = Slider(win, 900, 200, 40, 300, min=100, max=200, step=1, vertical=True)
-    # v_slider = Slider(win, 900, 200, 40, 300, style=modernDarkTheme, vertical=True)
-    v_output = TextBox(win, 750, 320, 100, 50, fontSize=30)
+    vertical_slider = Slider(
+        win, 900, 200, 40, 300, min=100, max=200, step=1, vertical=True
+    )
+    # vertical_slider = Slider(win, 900, 200, 40, 300, style=dark_theme, vertical=True)
+    vertical_slider_output = TextBox(win, 750, 320, 100, 50, fontSize=30)
 
     output.disable()
-    v_output.disable()
+    vertical_slider_output.disable()
 
     run = True
     while run:
@@ -243,12 +249,12 @@ if __name__ == "__main__":
             if event.type == pygame.QUIT:
                 pygame.quit()
                 run = False
-                quit()
+                sys.exit()
 
         win.fill((255, 255, 255))
 
-        output.set_text(slider.getValue())
-        v_output.set_text(v_slider.getValue())
+        output.set_text(slider.get_value())
+        vertical_slider_output.set_text(vertical_slider.get_value())
 
         pygame_widgets.update(events)
         pygame.display.update()
