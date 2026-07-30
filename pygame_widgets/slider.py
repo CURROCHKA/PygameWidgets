@@ -88,8 +88,8 @@ class Slider(WidgetBase):
 
     def listen(self, events: list[pygame.event.Event]) -> None:
         if not self._hidden and not self._disabled:
-            mouseState = Mouse.getMouseState()
-            x, y = Mouse.getMousePos()
+            mouseState = Mouse.get_mouse_state()
+            x, y = Mouse.get_mouse_pos()
 
             if self.contains(x, y):
                 if mouseState == MouseState.CLICK:
@@ -247,8 +247,8 @@ if __name__ == "__main__":
 
         win.fill((255, 255, 255))
 
-        output.setText(slider.getValue())
-        v_output.setText(v_slider.getValue())
+        output.set_text(slider.getValue())
+        v_output.set_text(v_slider.getValue())
 
         pygame_widgets.update(events)
         pygame.display.update()

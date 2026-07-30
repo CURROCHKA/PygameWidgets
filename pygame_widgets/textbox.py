@@ -389,7 +389,7 @@ class TextBox(WidgetBase):
 
                 local_start = max(0, start_column - line_start)
                 local_end = min(len(text), end_column - line_start)
-                
+
                 if local_start > local_end:
                     draw_segment(text, color, self._actual_x, line_y)
                     continue

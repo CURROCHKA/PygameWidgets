@@ -307,11 +307,11 @@ class WidgetHandler:
         widgets = list(WidgetHandler._widgets)
 
         for widget in reversed(widgets):
-            if not blocked or not widget.contains(*Mouse.getMousePos()):
+            if not blocked or not widget.contains(*Mouse.get_mouse_pos()):
                 widget.listen(events)
 
             # Ensure widgets covered by others are not affected (widgets created later)
-            if widget.contains(*Mouse.getMousePos()):  # TODO: Unless 'transparent'
+            if widget.contains(*Mouse.get_mouse_pos()):  # TODO: Unless 'transparent'
                 blocked = True
 
         for widget in widgets:

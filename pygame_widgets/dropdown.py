@@ -77,8 +77,8 @@ class Dropdown(WidgetBase):
         :type events: list of pygame.event.Event
         """
         if not self._hidden and not self._disabled:
-            mouse_state = Mouse.getMouseState()
-            x, y = Mouse.getMousePos()
+            mouse_state = Mouse.get_mouse_state()
+            x, y = Mouse.get_mouse_pos()
 
             if self.contains(x, y):
                 if mouse_state == MouseState.CLICK:
@@ -242,9 +242,7 @@ class DropdownChoice(WidgetBase):
                 self._width,
                 self._height,
             )
-            pygame.draw.rect(
-                self.win, self.color, rect, **self._compute_border_radii()
-            )
+            pygame.draw.rect(self.win, self.color, rect, **self._compute_border_radii())
 
             text_rendered = self.font.render(self.text, True, self.text_color)
 
@@ -284,8 +282,8 @@ class DropdownChoice(WidgetBase):
         :type events: list of pygame.event.Event
         """
         if not self._hidden and not self._disabled:
-            mouse_state = Mouse.getMouseState()
-            x, y = Mouse.getMousePos()
+            mouse_state = Mouse.get_mouse_state()
+            x, y = Mouse.get_mouse_pos()
 
             if self.contains(x, y):
                 if mouse_state == MouseState.RELEASE and self.clicked:
@@ -389,8 +387,8 @@ class HeadDropdown(DropdownChoice):
         :type events: list of pygame.event.Event
         """
         if not self._hidden and not self._disabled:
-            mouse_state = Mouse.getMouseState()
-            x, y = Mouse.getMousePos()
+            mouse_state = Mouse.get_mouse_state()
+            x, y = Mouse.get_mouse_pos()
 
             if self.contains(x, y):
                 if mouse_state == MouseState.CLICK:

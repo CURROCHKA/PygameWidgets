@@ -99,8 +99,8 @@ class Checkbox(WidgetBase):
         :type events: list of pygame.event.Event
         """
         if not self._hidden and not self._disabled:
-            mouseState = Mouse.getMouseState()
-            x, y = Mouse.getMousePos()
+            mouseState = Mouse.get_mouse_state()
+            x, y = Mouse.get_mouse_pos()
 
             if self.contains(x, y):
                 if mouseState == MouseState.CLICK:
@@ -266,8 +266,8 @@ class Radio(WidgetBase):
         :type events: list of pygame.event.Event
         """
         if not self._hidden and not self._disabled:
-            mouseState = Mouse.getMouseState()
-            x, y = Mouse.getMousePos()
+            mouseState = Mouse.get_mouse_state()
+            x, y = Mouse.get_mouse_pos()
 
             if self.contains(x, y):
                 if mouseState == MouseState.CLICK:

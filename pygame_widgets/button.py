@@ -71,9 +71,7 @@ class Button(WidgetBase):
         self.border_thickness = kwargs.get("border_thickness", 0)
         self.inactive_border_color = kwargs.get("inactive_border_color", (0, 0, 0))
         self.hover_border_color = kwargs.get("hover_border_color", (80, 80, 80))
-        self.pressed_border_color = kwargs.get(
-            "pressed_border_color", (100, 100, 100)
-        )
+        self.pressed_border_color = kwargs.get("pressed_border_color", (100, 100, 100))
         self.border_color = kwargs.get("border_color", self.inactive_border_color)
         self.inactive_border_color = self.border_color
         self.radius = kwargs.get("radius", 0)
@@ -119,8 +117,8 @@ class Button(WidgetBase):
         :type events: list of pygame.event.Event
         """
         if not self._hidden and not self._disabled:
-            mouse_state = Mouse.getMouseState()
-            x, y = Mouse.getMousePos()
+            mouse_state = Mouse.get_mouse_state()
+            x, y = Mouse.get_mouse_pos()
 
             if self.contains(x, y):
                 if mouse_state == MouseState.RELEASE and self.clicked:
