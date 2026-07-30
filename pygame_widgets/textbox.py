@@ -102,7 +102,7 @@ class TextBox(WidgetBase):
         y: int,
         width: int,
         height: int,
-        placeholder_text: str = '',
+        placeholder_text: str = "",
         repeat_delay: float = REPEAT_DELAY,
         repeat_interval: float = REPEAT_INTERVAL,
         cursor_interval: float = CURSOR_INTERVAL,
@@ -132,8 +132,8 @@ class TextBox(WidgetBase):
             self.font = self.style.font
         else:
             if self.style.font is not None:
-                print('Use pygame.freetype.Font or pygame.freetype.SysFont')
-            self.font = pygame.freetype.SysFont('calibri', self.style.font_size)
+                print("Use pygame.freetype.Font or pygame.freetype.SysFont")
+            self.font = pygame.freetype.SysFont("calibri", self.style.font_size)
         self.font.pad = True
 
         # Widget state
@@ -158,10 +158,10 @@ class TextBox(WidgetBase):
         self.selection_end = Cursor()
 
         # Text state
-        self.text = ['']
+        self.text = [""]
         self.placeholder_text = placeholder_text
         self.cached_visual_lines: list[VisualLine] = [
-            VisualLine(text='', line_index=0, start_at=0, prefix_widths=[0])
+            VisualLine(text="", line_index=0, start_at=0, prefix_widths=[0])
         ]
         self.visual_line_ranges: dict[int, tuple[int, int]] = {0: (0, 1)}
 
@@ -219,15 +219,14 @@ class TextBox(WidgetBase):
                 elif event.type == pygame.TEXTINPUT:
                     self.handle_text_input(event)
 
-                elif event.type == pygame.KEYUP:
-                    if (
-                        self.repeat_event is not None
-                        and self.repeat_event.type == pygame.KEYDOWN
-                        and event.key == self.repeat_event.key
-                    ):
-                        self.repeat_event = None
-                        self.key_down = False
-                        self.first_repeat = True
+                elif event.type == pygame.KEYUP and (
+                    self.repeat_event is not None
+                    and self.repeat_event.type == pygame.KEYDOWN
+                    and event.key == self.repeat_event.key
+                ):
+                    self.repeat_event = None
+                    self.key_down = False
+                    self.first_repeat = True
 
     def handle_mouse(self) -> None:
         mouse_state = Mouse.getMouseState()
@@ -340,7 +339,7 @@ class TextBox(WidgetBase):
 
     def _draw_text(self) -> None:
         # TODO: Fix bug with text_under_selection rendering
-        
+
         if self.is_empty_text(self.text):
             display_lines = [
                 VisualLine(
@@ -360,11 +359,16 @@ class TextBox(WidgetBase):
 
         for i in range(
             self.first_visible_line_index,
-            min(self.first_visible_line_index + self.max_visible_lines, len(display_lines)),
+            min(
+                self.first_visible_line_index + self.max_visible_lines,
+                len(display_lines),
+            ),
         ):
             visual_line = display_lines[i]
 
-            line_y = self._actual_y + (i - self.first_visible_line_index) * self.line_height
+            line_y = (
+                self._actual_y + (i - self.first_visible_line_index) * self.line_height
+            )
 
             if (
                 self.is_empty_selection()
@@ -374,7 +378,9 @@ class TextBox(WidgetBase):
                 self.win.blit(text_surface, (self._actual_x, line_y))
 
             else:
-                start_column = start.column if visual_line.line_index == start.line else 0
+                start_column = (
+                    start.column if visual_line.line_index == start.line else 0
+                )
                 end_column = (
                     end.column
                     if visual_line.line_index == end.line
@@ -382,7 +388,9 @@ class TextBox(WidgetBase):
                 )
 
                 local_start = max(0, start_column - visual_line.start_at)
-                local_end = min(len(visual_line.text), end_column - visual_line.start_at)
+                local_end = min(
+                    len(visual_line.text), end_column - visual_line.start_at
+                )
 
                 text_before_selection = visual_line.text[:local_start]
                 text_under_selection = visual_line.text[local_start:local_end]
@@ -446,7 +454,7 @@ class TextBox(WidgetBase):
                 else:
                     if self.cursor.column == len(self.text[self.cursor.line]):
                         text_surface = self.get_rendered_text_surface(
-                            ' ', self.style.text_color
+                            " ", self.style.text_color
                         )
                     else:
                         text_surface = self.get_rendered_text_surface(
@@ -497,7 +505,9 @@ class TextBox(WidgetBase):
             if not (start.line <= line_index <= end.line):
                 continue
 
-            line_y = self._actual_y + self.line_height * (i - self.first_visible_line_index)
+            line_y = self._actual_y + self.line_height * (
+                i - self.first_visible_line_index
+            )
 
             line_start = visual_line.start_at
 
@@ -521,7 +531,9 @@ class TextBox(WidgetBase):
                 == len(self.text[line_index])
             )
 
-            if local_start == local_end and not (is_empty_line or is_end_of_logical_line):
+            if local_start == local_end and not (
+                is_empty_line or is_end_of_logical_line
+            ):
                 continue
 
             text_before_width = visual_line.get_offset(local_start)
@@ -530,12 +542,17 @@ class TextBox(WidgetBase):
             text_width = text_up_to_end_width - text_before_width
 
             if is_empty_line or is_end_of_logical_line:
-                text_width += self.get_text_width(' ')
+                text_width += self.get_text_width(" ")
 
             pygame.draw.rect(
                 self.win,
                 self.style.selection_color,
-                (self._actual_x + text_before_width, line_y, text_width, self.line_height),
+                (
+                    self._actual_x + text_before_width,
+                    line_y,
+                    text_width,
+                    self.line_height,
+                ),
             )
 
     def process_mouse_click(self, x: int, y: int) -> None:
@@ -563,7 +580,9 @@ class TextBox(WidgetBase):
             self.first_visible_line_index = max(0, self.first_visible_line_index - 1)
         elif y > self._actual_y + self._actual_height:
             max_scroll = max(0, len(self.cached_visual_lines) - self.max_visible_lines)
-            self.first_visible_line_index = min(max_scroll, self.first_visible_line_index + 1)
+            self.first_visible_line_index = min(
+                max_scroll, self.first_visible_line_index + 1
+            )
 
     def process_mouse_double_click(self) -> None:
         self.move_cursor_word(direction=-1)
@@ -578,15 +597,19 @@ class TextBox(WidgetBase):
         )
 
     def process_mouse_scroll(self) -> None:
-        self.first_visible_line_index -= Mouse.getWheelDelta() * self.style.lines_per_scroll
+        self.first_visible_line_index -= (
+            Mouse.getWheelDelta() * self.style.lines_per_scroll
+        )
         max_scroll = max(0, len(self.cached_visual_lines) - self.max_visible_lines)
-        self.first_visible_line_index = max(0, min(self.first_visible_line_index, max_scroll))
+        self.first_visible_line_index = max(
+            0, min(self.first_visible_line_index, max_scroll)
+        )
 
     def process_return(self, event: pygame.Event) -> None:
         if self.style.read_only:
             return
         if event.mod & pygame.KMOD_SHIFT or event.mod & pygame.KMOD_CTRL:
-            self.add_text('\n')
+            self.add_text("\n")
         else:
             self.on_submit(*self.on_submit_params)
 
@@ -843,11 +866,17 @@ class TextBox(WidgetBase):
         if visual_line_index < self.first_visible_line_index:
             self.first_visible_line_index = visual_line_index
 
-        elif visual_line_index >= self.first_visible_line_index + self.max_visible_lines:
-            self.first_visible_line_index = visual_line_index - self.max_visible_lines + 1
+        elif (
+            visual_line_index >= self.first_visible_line_index + self.max_visible_lines
+        ):
+            self.first_visible_line_index = (
+                visual_line_index - self.max_visible_lines + 1
+            )
 
         max_scroll = max(0, len(self.cached_visual_lines) - self.max_visible_lines)
-        self.first_visible_line_index = max(0, min(self.first_visible_line_index, max_scroll))
+        self.first_visible_line_index = max(
+            0, min(self.first_visible_line_index, max_scroll)
+        )
 
     def update_layout(self) -> None:
         self._actual_height = (
@@ -860,8 +889,8 @@ class TextBox(WidgetBase):
         if not self.is_empty_selection():
             self.erase_selected_text(call_on_text_changed=False)
 
-        text = str(text).replace('\t', ' ' * self.style.tab_spaces).replace('\r', '')
-        lines = text.split('\n')
+        text = str(text).replace("\t", " " * self.style.tab_spaces).replace("\r", "")
+        lines = text.split("\n")
 
         if not self.insert_on:
             right_part = self.text[self.cursor.line][self.cursor.column :]
@@ -875,7 +904,7 @@ class TextBox(WidgetBase):
                 )
 
                 if i != len(lines) - 1:
-                    self.text.insert(self.cursor.line + 1, '')
+                    self.text.insert(self.cursor.line + 1, "")
                     self.cursor.set(self.cursor.line + 1, 0, self.text)
 
             self.text[self.cursor.line] += right_part
@@ -894,7 +923,7 @@ class TextBox(WidgetBase):
                 )
 
                 if i != len(lines) - 1:
-                    self.text.insert(self.cursor.line + 1, '')
+                    self.text.insert(self.cursor.line + 1, "")
                     self.cursor.set(self.cursor.line + 1, 0, self.text)
 
                 self.text[self.cursor.line] += right_part
@@ -961,8 +990,8 @@ class TextBox(WidgetBase):
         Returns:
             Visual-line fragments that cover the whole logical line.
         """
-        if line == '':
-            return [self._make_visual_line('', line_index, 0)]
+        if line == "":
+            return [self._make_visual_line("", line_index, 0)]
 
         visual_lines = []
         start = 0
@@ -984,12 +1013,16 @@ class TextBox(WidgetBase):
                 start = end
                 continue
 
-            last_space = line.rfind(' ', start, end + 1)
-            can_wrap_by_space = last_space >= start and line[start:last_space].strip() != ''
+            last_space = line.rfind(" ", start, end + 1)
+            can_wrap_by_space = (
+                last_space >= start and line[start:last_space].strip() != ""
+            )
 
             if can_wrap_by_space:
                 visual_lines.append(
-                    self._make_visual_line(line[start : last_space + 1], line_index, start)
+                    self._make_visual_line(
+                        line[start : last_space + 1], line_index, start
+                    )
                 )
                 start = last_space + 1
             else:
@@ -1000,7 +1033,9 @@ class TextBox(WidgetBase):
 
         return visual_lines
 
-    def _make_visual_line(self, text: str, line_index: int, start_at: int) -> VisualLine:
+    def _make_visual_line(
+        self, text: str, line_index: int, start_at: int
+    ) -> VisualLine:
         """Create a ``VisualLine`` and precompute cursor offsets for its text.
 
         ``start_at`` is the column where ``text`` begins inside the original
@@ -1094,7 +1129,8 @@ class TextBox(WidgetBase):
                 if (
                     cursor.column == line_width != 0
                     and line_index + 1 < len(self.cached_visual_lines)
-                    and self.cached_visual_lines[line_index + 1].line_index == cursor.line
+                    and self.cached_visual_lines[line_index + 1].line_index
+                    == cursor.line
                 ):
                     return line_index + 1
                 return line_index
@@ -1170,10 +1206,10 @@ class TextBox(WidgetBase):
             self.cursor_time = now
 
     def is_empty_text(self, text: list[str]) -> bool:
-        return len(text) == 1 and text[0] == ''
+        return len(text) == 1 and text[0] == ""
 
     def is_word_char(self, character: str) -> bool:
-        return character.isalnum() or character == '_'
+        return character.isalnum() or character == "_"
 
     def is_empty_selection(self) -> bool:
         return (self.selection_start.line, self.selection_start.column) == (
@@ -1190,7 +1226,7 @@ class TextBox(WidgetBase):
         self.reset_selection()
 
     def set_text(self, text: str) -> None:
-        self.text = ['']
+        self.text = [""]
         self.cursor.set(0, 0, self.text)
         self.reset_selection()
         self.add_text(text, call_on_text_changed=False)
@@ -1219,7 +1255,9 @@ class TextBox(WidgetBase):
             line -= 1
             current_line = self.text[line]
             column = len(current_line)
-        elif direction == 1 and column == len(current_line) and line < len(self.text) - 1:
+        elif (
+            direction == 1 and column == len(current_line) and line < len(self.text) - 1
+        ):
             line += 1
             current_line = self.text[line]
             column = 0
@@ -1258,7 +1296,8 @@ class TextBox(WidgetBase):
         )
 
         raw_index = (
-            self.first_visible_line_index + (clamped_y - self._actual_y) // self.line_height
+            self.first_visible_line_index
+            + (clamped_y - self._actual_y) // self.line_height
         )
         visual_line_index = max(
             self.first_visible_line_index,
@@ -1295,7 +1334,7 @@ class TextBox(WidgetBase):
         )
 
     def get_text(self) -> str:
-        return '\n'.join(self.text)
+        return "\n".join(self.text)
 
     def get_selected_text(self) -> str:
         start, end = self.get_normalized_selection()
@@ -1307,12 +1346,11 @@ class TextBox(WidgetBase):
 
         result.append(self.text[start.line][start.column :])
 
-        for line in self.text[start.line + 1 : end.line]:
-            result.append(line)
+        result.extend(self.text[start.line + 1 : end.line])
 
         result.append(self.text[end.line][: end.column])
 
-        return '\n'.join(result)
+        return "\n".join(result)
 
     def set(self, attr: str, value: int) -> None:
         super().set(attr, value)
@@ -1335,11 +1373,11 @@ class TextBox(WidgetBase):
         self.reconfigure_layout()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     def output():
         print(textbox.get_text())
-        textbox.set_text('')
+        textbox.set_text("")
 
     pygame.init()
     win = pygame.display.set_mode((1000, 600))
@@ -1365,7 +1403,7 @@ if __name__ == '__main__':
         on_submit=output,
         radius=10,
         border_thickness=5,
-        placeholder_text='Enter something:',
+        placeholder_text="Enter something:",
     )
 
     run = True
