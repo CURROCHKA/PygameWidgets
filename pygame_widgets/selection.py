@@ -1,9 +1,10 @@
-import pygame
 import math
 
+import pygame
+
 import pygame_widgets
-from pygame_widgets.widget import WidgetBase
 from pygame_widgets.mouse import Mouse, MouseState
+from pygame_widgets.widget import WidgetBase
 
 
 class Checkbox(WidgetBase):
@@ -28,66 +29,66 @@ class Checkbox(WidgetBase):
 
         self.items = items
         self.rows = len(items)
-        self.rowHeight = self._height // self.rows
+        self.row_height = self._height // self.rows
         self.selected = [False for _ in range(self.rows)]
 
         # Border
-        self.borderThickness = kwargs.get("borderThickness", 3)
-        self.borderColour = kwargs.get("borderColour", (0, 0, 0))
+        self.border_thickness = kwargs.get("border_thickness", 3)
+        self.border_color = kwargs.get("border_color", (0, 0, 0))
         self.radius = kwargs.get("radius", 0)
 
         # Checkbox
-        self.boxSize = int(kwargs.get("boxSize", self._height / self.rows // 3))
-        self.boxThickness = kwargs.get("boxThickness", 3)
-        self.boxColour = kwargs.get("boxColour", (0, 0, 0))
-        # TODO: selected image (tick) / colour
+        self.box_size = int(kwargs.get("box_size", self._height / self.rows // 3))
+        self.box_thickness = kwargs.get("box_thickness", 3)
+        self.box_color = kwargs.get("box_color", (0, 0, 0))
+        # TODO: selected image (tick) / color
 
-        # Colour
-        self.colour = kwargs.get("colour", (255, 255, 255))
+        # Color
+        self.color = kwargs.get("color", (255, 255, 255))
 
-        # Alternating colours: overrides colour
-        self.colour1 = kwargs.get("colour1", self.colour)
-        self.colour2 = kwargs.get("colour2", self.colour)
+        # Alternating colors: overrides color
+        self.color1 = kwargs.get("color1", self.color)
+        self.color2 = kwargs.get("color2", self.color)
 
         # Text
-        self.textColour = kwargs.get("textColour", (0, 0, 0))
-        self.fontSize = kwargs.get("fontSize", 20)
-        self.font = kwargs.get("font", pygame.font.SysFont("calibri", self.fontSize))
+        self.text_color = kwargs.get("text_color", (0, 0, 0))
+        self.font_size = kwargs.get("font_size", 20)
+        self.font = kwargs.get("font", pygame.font.SysFont("calibri", self.font_size))
         self.texts = [
-            self.font.render(self.items[row], True, self.textColour)
+            self.font.render(self.items[row], True, self.text_color)
             for row in range(self.rows)
         ]
-        self.textRects = self.createTextRects()
+        self.text_rects = self.create_text_rects()
 
         self.clicked = False
 
-        self.boxes = self.createBoxLocations()
+        self.boxes = self.create_box_locations()
 
-    def createTextRects(self):
-        textRects = []
+    def create_text_rects(self):
+        text_rects = []
         for row in range(self.rows):
-            textRects.append(
+            text_rects.append(
                 self.texts[row].get_rect(
                     center=(
                         self._x
-                        + self.boxSize * 2
-                        + (self._width - self.boxSize * 2) // 2,
-                        self._y + self.rowHeight * row + self.rowHeight // 2,
+                        + self.box_size * 2
+                        + (self._width - self.box_size * 2) // 2,
+                        self._y + self.row_height * row + self.row_height // 2,
                     )
                 )
             )
 
-        return textRects
+        return text_rects
 
-    def createBoxLocations(self):
+    def create_box_locations(self):
         boxes = []
         for row in range(self.rows):
             boxes.append(
                 pygame.Rect(
-                    self._x + self.boxSize,
-                    self._y + self.rowHeight * row + self.boxSize,
-                    self.boxSize,
-                    self.boxSize,
+                    self._x + self.box_size,
+                    self._y + self.row_height * row + self.box_size,
+                    self.box_size,
+                    self.box_size,
                 )
             )
         return boxes
@@ -99,78 +100,66 @@ class Checkbox(WidgetBase):
         :type events: list of pygame.event.Event
         """
         if not self._hidden and not self._disabled:
-            mouseState = Mouse.get_mouse_state()
+            mouse_state = Mouse.get_mouse_state()
             x, y = Mouse.get_mouse_pos()
 
-            if self.contains(x, y):
-                if mouseState == MouseState.CLICK:
-                    for row in range(self.rows):
-                        if self.boxes[row].collidepoint(x, y):
-                            self.selected[row] = not self.selected[row]
+            if self.contains(x, y) and mouse_state == MouseState.CLICK:
+                for row in range(self.rows):
+                    if self.boxes[row].collidepoint(x, y):
+                        self.selected[row] = not self.selected[row]
 
     def draw(self):
         """Display to surface"""
         if not self._hidden:
             for row in range(self.rows):
-                colour = self.colour1 if not row % 2 else self.colour2
-                if pygame.version.vernum[0] < 2:
+                color = self.color1 if not row % 2 else self.color2
+
+                if row == 0:
                     pygame.draw.rect(
                         self.win,
-                        colour,
+                        color,
                         (
                             self._x,
-                            self._y + self.rowHeight * row,
+                            self._y + self.row_height * row,
                             self._width,
-                            self.rowHeight,
+                            self.row_height,
+                        ),
+                        border_top_left_radius=self.radius,
+                        border_top_right_radius=self.radius,
+                    )
+
+                elif row == self.rows - 1:
+                    pygame.draw.rect(
+                        self.win,
+                        color,
+                        (
+                            self._x,
+                            self._y + self.row_height * row,
+                            self._width,
+                            self.row_height,
+                        ),
+                        border_bottom_left_radius=self.radius,
+                        border_bottom_right_radius=self.radius,
+                    )
+
+                else:
+                    pygame.draw.rect(
+                        self.win,
+                        color,
+                        (
+                            self._x,
+                            self._y + self.row_height * row,
+                            self._width,
+                            self.row_height,
                         ),
                     )
-                else:
-                    if row == 0:
-                        pygame.draw.rect(
-                            self.win,
-                            colour,
-                            (
-                                self._x,
-                                self._y + self.rowHeight * row,
-                                self._width,
-                                self.rowHeight,
-                            ),
-                            border_top_left_radius=self.radius,
-                            border_top_right_radius=self.radius,
-                        )
 
-                    elif row == self.rows - 1:
-                        pygame.draw.rect(
-                            self.win,
-                            colour,
-                            (
-                                self._x,
-                                self._y + self.rowHeight * row,
-                                self._width,
-                                self.rowHeight,
-                            ),
-                            border_bottom_left_radius=self.radius,
-                            border_bottom_right_radius=self.radius,
-                        )
+                width = 0 if self.selected[row] else self.box_thickness
+                pygame.draw.rect(self.win, self.box_color, self.boxes[row], width)
 
-                    else:
-                        pygame.draw.rect(
-                            self.win,
-                            colour,
-                            (
-                                self._x,
-                                self._y + self.rowHeight * row,
-                                self._width,
-                                self.rowHeight,
-                            ),
-                        )
+                self.win.blit(self.texts[row], self.text_rects[row])
 
-                width = 0 if self.selected[row] else self.boxThickness
-                pygame.draw.rect(self.win, self.boxColour, self.boxes[row], width)
-
-                self.win.blit(self.texts[row], self.textRects[row])
-
-    def getSelected(self):
+    def get_selected(self):
         return [self.items[row] for row in range(self.rows) if self.selected[row]]
 
 
@@ -196,65 +185,67 @@ class Radio(WidgetBase):
 
         self.items = items
         self.rows = len(items)
-        self.rowHeight = self._height // self.rows
+        self.row_height = self._height // self.rows
         self.selected = kwargs.get("default", 0)
 
         # Border
-        self.borderThickness = kwargs.get("borderThickness", 3)
-        self.borderColour = kwargs.get("borderColour", (0, 0, 0))
+        self.border_thickness = kwargs.get("border_thickness", 3)
+        self.border_color = kwargs.get("border_color", (0, 0, 0))
         self.radius = kwargs.get("radius", 0)
 
         # Radio
-        self.circleRadius = int(
-            kwargs.get("circleRadius", self._height / self.rows // 6)
+        self.circle_radius = int(
+            kwargs.get("circle_radius", self._height / self.rows // 6)
         )
-        self.circleThickness = kwargs.get("circleThickness", 3)
-        self.circleColour = kwargs.get("circleColour", (0, 0, 0))
+        self.circle_thickness = kwargs.get("circle_thickness", 3)
+        self.circle_color = kwargs.get("circle_color", (0, 0, 0))
 
-        # Colour
-        self.colour = kwargs.get("colour", (255, 255, 255))
+        # Color
+        self.color = kwargs.get("color", (255, 255, 255))
 
-        # Alternating colours: overrides colour
-        self.colour1 = kwargs.get("colour1", self.colour)
-        self.colour2 = kwargs.get("colour2", self.colour)
+        # Alternating colors: overrides color
+        self.color1 = kwargs.get("color1", self.color)
+        self.color2 = kwargs.get("color2", self.color)
 
         # Text
-        self.textColour = kwargs.get("textColour", (0, 0, 0))
-        self.fontSize = kwargs.get("fontSize", 20)
-        self.font = kwargs.get("font", pygame.font.SysFont("sans-serif", self.fontSize))
+        self.text_color = kwargs.get("text_color", (0, 0, 0))
+        self.font_size = kwargs.get("font_size", 20)
+        self.font = kwargs.get(
+            "font", pygame.font.SysFont("sans-serif", self.font_size)
+        )
         self.texts = [
-            self.font.render(self.items[row], True, self.textColour)
+            self.font.render(self.items[row], True, self.text_color)
             for row in range(self.rows)
         ]
-        self.textRects = self.createTextRects()
+        self.text_rects = self.create_text_rects()
 
         self.clicked = False
 
-        self.circles = self.createCircleLocations()
+        self.circles = self.create_circle_locations()
 
-    def createTextRects(self):
-        textRects = []
+    def create_text_rects(self):
+        text_rects = []
         for row in range(self.rows):
-            textRects.append(
+            text_rects.append(
                 self.texts[row].get_rect(
                     center=(
                         self._x
-                        + self.circleRadius * 6
-                        + (self._width - self.circleRadius * 6) // 2,
-                        self._y + self.rowHeight * row + self.rowHeight // 2,
+                        + self.circle_radius * 6
+                        + (self._width - self.circle_radius * 6) // 2,
+                        self._y + self.row_height * row + self.row_height // 2,
                     )
                 )
             )
 
-        return textRects
+        return text_rects
 
-    def createCircleLocations(self):
+    def create_circle_locations(self):
         circles = []
         for row in range(self.rows):
             circles.append(
                 (
-                    self._x + self.circleRadius * 3,
-                    self._y + self.rowHeight * row + self.rowHeight // 2,
+                    self._x + self.circle_radius * 3,
+                    self._y + self.row_height * row + self.row_height // 2,
                 )
             )
         return circles
@@ -266,92 +257,81 @@ class Radio(WidgetBase):
         :type events: list of pygame.event.Event
         """
         if not self._hidden and not self._disabled:
-            mouseState = Mouse.get_mouse_state()
+            mouse_state = Mouse.get_mouse_state()
             x, y = Mouse.get_mouse_pos()
 
-            if self.contains(x, y):
-                if mouseState == MouseState.CLICK:
-                    for row in range(self.rows):
-                        if (
-                            math.sqrt(
-                                (self.circles[row][0] - x) ** 2
-                                + (self.circles[row][1] - y) ** 2
-                            )
-                            <= self.circleRadius
-                        ):
-                            self.selected = row
+            if self.contains(x, y) and mouse_state == MouseState.CLICK:
+                for row in range(self.rows):
+                    if (
+                        math.sqrt(
+                            (self.circles[row][0] - x) ** 2
+                            + (self.circles[row][1] - y) ** 2
+                        )
+                        <= self.circle_radius
+                    ):
+                        self.selected = row
 
     def draw(self):
         """Display to surface"""
         if not self._hidden:
             for row in range(self.rows):
-                colour = self.colour1 if not row % 2 else self.colour2
-                if pygame.version.vernum[0] < 2:
+                color = self.color1 if not row % 2 else self.color2
+
+                if row == 0:
                     pygame.draw.rect(
                         self.win,
-                        colour,
+                        color,
                         (
                             self._x,
-                            self._y + self.rowHeight * row,
+                            self._y + self.row_height * row,
                             self._width,
-                            self.rowHeight,
+                            self.row_height,
                         ),
+                        border_top_left_radius=self.radius,
+                        border_top_right_radius=self.radius,
+                    )
+
+                elif row == self.rows - 1:
+                    pygame.draw.rect(
+                        self.win,
+                        color,
+                        (
+                            self._x,
+                            self._y + self.row_height * row,
+                            self._width,
+                            self.row_height,
+                        ),
+                        border_bottom_left_radius=self.radius,
+                        border_bottom_right_radius=self.radius,
                     )
 
                 else:
-                    if row == 0:
-                        pygame.draw.rect(
-                            self.win,
-                            colour,
-                            (
-                                self._x,
-                                self._y + self.rowHeight * row,
-                                self._width,
-                                self.rowHeight,
-                            ),
-                            border_top_left_radius=self.radius,
-                            border_top_right_radius=self.radius,
-                        )
+                    pygame.draw.rect(
+                        self.win,
+                        color,
+                        (
+                            self._x,
+                            self._y + self.row_height * row,
+                            self._width,
+                            self.row_height,
+                        ),
+                    )
 
-                    elif row == self.rows - 1:
-                        pygame.draw.rect(
-                            self.win,
-                            colour,
-                            (
-                                self._x,
-                                self._y + self.rowHeight * row,
-                                self._width,
-                                self.rowHeight,
-                            ),
-                            border_bottom_left_radius=self.radius,
-                            border_bottom_right_radius=self.radius,
-                        )
-
-                    else:
-                        pygame.draw.rect(
-                            self.win,
-                            colour,
-                            (
-                                self._x,
-                                self._y + self.rowHeight * row,
-                                self._width,
-                                self.rowHeight,
-                            ),
-                        )
-
-                width = 0 if row == self.selected else self.circleThickness
+                width = 0 if row == self.selected else self.circle_thickness
                 pygame.draw.circle(
                     self.win,
-                    self.circleColour,
+                    self.circle_color,
                     self.circles[row],
-                    self.circleRadius,
+                    self.circle_radius,
                     width,
                 )
 
-                self.win.blit(self.texts[row], self.textRects[row])
+                self.win.blit(self.texts[row], self.text_rects[row])
 
 
 if __name__ == "__main__":
+    import sys
+
     pygame.init()
     win = pygame.display.set_mode((1000, 800))
 
@@ -362,9 +342,9 @@ if __name__ == "__main__":
         400,
         300,
         ("Apples", "Bananas", "Pears"),
-        colour1=(0, 180, 0),
-        colour2=(0, 50, 200),
-        fontSize=30,
+        color1=(0, 180, 0),
+        color2=(0, 50, 200),
+        font_size=30,
         radius=10,
     )
     radio = Radio(
@@ -374,9 +354,9 @@ if __name__ == "__main__":
         400,
         300,
         ("Apples", "Bananas", "Pears"),
-        colour1=(0, 180, 0),
-        colour2=(0, 50, 200),
-        fontSize=30,
+        color1=(0, 180, 0),
+        color2=(0, 50, 200),
+        font_size=30,
         radius=10,
     )
 
@@ -387,7 +367,7 @@ if __name__ == "__main__":
             if event.type == pygame.QUIT:
                 pygame.quit()
                 run = False
-                quit()
+                sys.exit()
 
         win.fill((255, 255, 255))
 
