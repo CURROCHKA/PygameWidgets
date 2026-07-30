@@ -35,7 +35,7 @@ class ComboBox(Dropdown):
         self.choices = choices
         self.suggestions = choices  # Stores the current suggestions
 
-        self._searchAlgo = kwargs.get('searchAlgo', self._defaultSearch)
+        self._searchAlgo = kwargs.get("searchAlgo", self._defaultSearch)
 
         # Adds params that are not specified in text box
         for key, value in kwargs.items():
@@ -54,42 +54,42 @@ class ComboBox(Dropdown):
         )
         self.__main = self.textBar
         # Set the number of choices if not given
-        self.maxResults = kwargs.get('maxResults', len(choices))
+        self.maxResults = kwargs.get("maxResults", len(choices))
 
         self.createDropdownChoices(x, y, width, height, **kwargs)
 
         self.getText = self.textBar.getText
 
         # Function
-        self.onSelected = kwargs.get('onSelected', lambda *args: None)
-        self.onSelectedParams = kwargs.get('onSelectedParams', ())
-        self.onStartSearch = kwargs.get('onStartSearch', lambda *args: None)
-        self.onStartSearchParams = kwargs.get('onStartSearchParams', ())
-        self.onStopSearch = kwargs.get('onStopSearch', lambda *args: None)
-        self.onStopSearchParams = kwargs.get('onStopSearchParams', ())
+        self.onSelected = kwargs.get("onSelected", lambda *args: None)
+        self.onSelectedParams = kwargs.get("onSelectedParams", ())
+        self.onStartSearch = kwargs.get("onStartSearch", lambda *args: None)
+        self.onStartSearchParams = kwargs.get("onStartSearchParams", ())
+        self.onStopSearch = kwargs.get("onStopSearch", lambda *args: None)
+        self.onStopSearchParams = kwargs.get("onStopSearchParams", ())
 
     def createDropdownChoices(self, x, y, width, height, **kwargs):
         """Create the widgets for the choices."""
         # We create the DropdownChoice(s)
-        direction = kwargs.get('direction', 'down')
+        direction = kwargs.get("direction", "down")
         self.__choices = []
         for i, text in enumerate(self.choices):
             if i == self.maxResults:
                 return
 
-            if direction == 'down':
+            if direction == "down":
                 x = 0
                 y = (i + 1) * height
 
-            elif direction == 'up':
+            elif direction == "up":
                 x = 0
                 y = -(i + 1) * height
 
-            elif direction == 'right':
+            elif direction == "right":
                 x = (i + 1) * width
                 y = 0
 
-            elif direction == 'left':
+            elif direction == "left":
                 x = -(i + 1) * width
                 y = 0
 
@@ -125,7 +125,7 @@ class ComboBox(Dropdown):
                     if dropdownChoice.clicked:
                         # The choice was clicked by user
                         self.textBar.setText(dropdownChoice.text)
-                        # TODO 
+                        # TODO
                         # Если написать какой нибудь цвет,
                         # потом выбрать его из выпадающего меню,
                         # затем кликнуть два раза (double click) по textbox,
@@ -177,7 +177,7 @@ class ComboBox(Dropdown):
         """
         text = self.textBar.getText()
 
-        if text != '':
+        if text != "":
             # Finds all the texts that start with the same text
             self.suggestions = self._searchAlgo(text, self.choices)
             self._dropped = True
@@ -186,7 +186,7 @@ class ComboBox(Dropdown):
 
     def _searchAlgo(self, text, choices):
         """Return the suggestions of text in choices."""
-        raise NotImplementedError('A search method must override this.')
+        raise NotImplementedError("A search method must override this.")
 
     @staticmethod
     def _defaultSearch(text, choices):
@@ -201,7 +201,7 @@ class ComboBox(Dropdown):
         return suggestions
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import pygame
     from pygame_widgets.button import Button
 
@@ -214,14 +214,14 @@ if __name__ == '__main__':
         10,
         250,
         50,
-        name='Select Colour',
+        name="Select Colour",
         choices=pygame.colordict.THECOLORS.keys(),
         maxResults=4,
-        font=pygame.font.SysFont('calibri', 30),
+        font=pygame.font.SysFont("calibri", 30),
         borderRadius=3,
         colour=(0, 200, 50),
-        direction='down',
-        textHAlign='left',
+        direction="down",
+        textHAlign="left",
     )
 
     def output():
@@ -233,15 +233,15 @@ if __name__ == '__main__':
         10,
         100,
         50,
-        text='Set Colour',
+        text="Set Colour",
         fontSize=30,
         margin=15,
         inactiveColour=(200, 0, 100),
         pressedColour=(0, 255, 0),
         radius=5,
         onClick=output,
-        font=pygame.font.SysFont('calibri', 18),
-        textVAlign='bottom',
+        font=pygame.font.SysFont("calibri", 18),
+        textVAlign="bottom",
     )
 
     run = True

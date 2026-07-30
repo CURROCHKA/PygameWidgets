@@ -1,21 +1,19 @@
-import pyperclip
 import sys
+from collections import OrderedDict
+from dataclasses import dataclass, field, replace
+from typing import Literal, NamedTuple
 
 import pygame
 import pygame.freetype
+import pyperclip
 from pygame.typing import ColorLike
 
 import pygame_widgets
-from pygame_widgets.widget import WidgetBase
 from pygame_widgets.mouse import Mouse, MouseState
-
-from dataclasses import dataclass, field, replace
-from collections import OrderedDict
-
-from typing import Literal, NamedTuple
+from pygame_widgets.widget import WidgetBase
 
 
-def _emptyCallback() -> None:
+def _empty_callback() -> None:
     pass
 
 
@@ -23,7 +21,7 @@ def _emptyCallback() -> None:
 class Cursor:
     line: int = 0
     column: int = 0
-    preferredColumn: int = field(default=0, compare=False)
+    preferred_column: int = field(default=0, compare=False)
 
     def clamp(self, lines: list[str]) -> None:
         self.line = max(0, min(self.line, len(lines) - 1))
@@ -37,11 +35,11 @@ class Cursor:
 
 class VisualLine(NamedTuple):
     text: str
-    lineIndex: int
-    startAt: int
-    prefixWidths: list[int]
+    line_index: int
+    start_at: int
+    prefix_widths: list[int]
 
-    def getOffset(self, column: int) -> int:
+    def get_offset(self, column: int) -> int:
         """Return the x offset for a cursor column within this visual line.
 
         ``column`` is local to this visual fragment, not the original logical
@@ -54,38 +52,38 @@ class VisualLine(NamedTuple):
         Returns:
             Pixel offset from the visual line's left edge.
         """
-        column = max(0, min(column, len(self.prefixWidths) - 1))
-        return self.prefixWidths[column]
+        column = max(0, min(column, len(self.prefix_widths) - 1))
+        return self.prefix_widths[column]
 
 
 @dataclass
 class TextBoxStyle:
-    colour: tuple[int, int, int] = (220, 220, 220)
-    borderThickness: int = 3
-    borderColour: tuple[int, int, int] = (0, 0, 0)
+    color: tuple[int, int, int] = (220, 220, 220)
+    border_thickness: int = 3
+    border_color: tuple[int, int, int] = (0, 0, 0)
     radius: int = 0
 
-    fontSize: int = 20
+    font_size: int = 20
     font: pygame.freetype.Font | None = None
-    textColour: tuple[int, int, int] = (0, 0, 0)
+    text_color: tuple[int, int, int] = (0, 0, 0)
 
-    cursorWidth: int = 2
-    cursorColour: tuple[int, int, int] = (0, 0, 0)
-    cursorAlpha: int = 63
+    cursor_width: int = 2
+    cursor_color: tuple[int, int, int] = (0, 0, 0)
+    cursor_alpha: int = 63
 
-    selectionColour: tuple[int, int, int] = (166, 210, 255)
-    textColourUnderSelection: tuple[int, int, int] = (
+    selection_color: tuple[int, int, int] = (166, 210, 255)
+    text_color_under_selection: tuple[int, int, int] = (
         255,
         255,
         255,
     )
 
-    placeholderTextColour: tuple[int, int, int] = (10, 10, 10)
+    placeholder_text_color: tuple[int, int, int] = (10, 10, 10)
 
-    readOnly: bool = False
-    tabSpaces: int = 4
+    read_only: bool = False
+    tab_spaces: int = 4
 
-    linesPerScroll: int = 1
+    lines_per_scroll: int = 1
 
 
 class TextBox(WidgetBase):
@@ -104,205 +102,205 @@ class TextBox(WidgetBase):
         y: int,
         width: int,
         height: int,
-        placeholderText: str = '',
-        repeatDelay: float = REPEAT_DELAY,
-        repeatInterval: float = REPEAT_INTERVAL,
-        cursorInterval: float = CURSOR_INTERVAL,
-        doubleClickInterval: float = DOUBLE_CLICK_INTERVAL,
-        onSubmit: callable = _emptyCallback,
-        onSubmitParams: tuple = (),
-        onTextChanged: callable = _emptyCallback,
-        onTextChangedParams: tuple = (),
+        placeholder_text: str = '',
+        repeat_delay: float = REPEAT_DELAY,
+        repeat_interval: float = REPEAT_INTERVAL,
+        cursor_interval: float = CURSOR_INTERVAL,
+        double_click_interval: float = DOUBLE_CLICK_INTERVAL,
+        on_submit: callable = _empty_callback,
+        on_submit_params: tuple = (),
+        on_text_changed: callable = _empty_callback,
+        on_text_changed_params: tuple = (),
         style: TextBoxStyle = None,
-        isSubWidget=False,
+        is_sub_widget=False,
         **kwargs,
     ) -> None:
-        super().__init__(win, x, y, width, height, isSubWidget)
+        super().__init__(win, x, y, width, height, is_sub_widget)
 
         if not pygame.get_init():
             pygame.init()
 
-        styleKwargs = {
+        style_kwargs = {
             k: v for k, v in kwargs.items() if k in TextBoxStyle.__dataclass_fields__
         }
         if style is None:
-            self.style = TextBoxStyle(**styleKwargs)
+            self.style = TextBoxStyle(**style_kwargs)
         else:
-            self.style = replace(style, **styleKwargs)
+            self.style = replace(style, **style_kwargs)
 
         if isinstance(self.style.font, pygame.freetype.Font):
             self.font = self.style.font
         else:
             if self.style.font is not None:
                 print('Use pygame.freetype.Font or pygame.freetype.SysFont')
-            self.font = pygame.freetype.SysFont('calibri', self.style.fontSize)
+            self.font = pygame.freetype.SysFont('calibri', self.style.font_size)
         self.font.pad = True
 
         # Widget state
         self.selected = False
-        self.keyDown = False
-        self.repeatTime = 0
-        self.repeatEvent = None
-        self.firstRepeat = True
-        self.insertOn = False
-        self.showCursor = not self.style.readOnly
-        self.cursorTime = 0
-        self.lastClickTime = 0
+        self.key_down = False
+        self.repeat_time = 0
+        self.repeat_event = None
+        self.first_repeat = True
+        self.insert_on = False
+        self.show_cursor = not self.style.read_only
+        self.cursor_time = 0
+        self.last_click_time = 0
 
-        self.repeatDelay = repeatDelay
-        self.repeatInterval = repeatInterval
-        self.cursorInterval = cursorInterval
-        self.doubleClickInterval = doubleClickInterval
+        self.repeat_delay = repeat_delay
+        self.repeat_interval = repeat_interval
+        self.cursor_interval = cursor_interval
+        self.double_click_interval = double_click_interval
 
         # Cursor state and style
         self.cursor = Cursor()
-        self.selectionStart = Cursor()
-        self.selectionEnd = Cursor()
+        self.selection_start = Cursor()
+        self.selection_end = Cursor()
 
         # Text state
         self.text = ['']
-        self.placeholderText = placeholderText
-        self.cachedVisualLines: list[VisualLine] = [
-            VisualLine(text='', lineIndex=0, startAt=0, prefixWidths=[0])
+        self.placeholder_text = placeholder_text
+        self.cached_visual_lines: list[VisualLine] = [
+            VisualLine(text='', line_index=0, start_at=0, prefix_widths=[0])
         ]
-        self.visualLineRanges: dict[int, tuple[int, int]] = {0: (0, 1)}
+        self.visual_line_ranges: dict[int, tuple[int, int]] = {0: (0, 1)}
 
         # Margins
-        self.textOffsetTop = self.style.fontSize // 3
-        self.textOffsetLeft = self.style.fontSize // 3
-        self.textOffsetRight = self.style.fontSize // 2
+        self.text_offset_top = self.style.font_size // 3
+        self.text_offset_left = self.style.font_size // 3
+        self.text_offset_right = self.style.font_size // 2
 
         # Callback
-        self.onSubmit = onSubmit
-        self.onSubmitParams = onSubmitParams
-        self.onTextChanged = onTextChanged
-        self.onTextChangedParams = onTextChangedParams
+        self.on_submit = on_submit
+        self.on_submit_params = on_submit_params
+        self.on_text_changed = on_text_changed
+        self.on_text_changed_params = on_text_changed_params
 
         # Cache
-        self._widthCache = OrderedDict()
-        self._renderedTextCache = OrderedDict()
+        self._width_cache = OrderedDict()
+        self._rendered_text_cache = OrderedDict()
 
         # Layout
-        self.firstVisibleLineIndex = 0
-        self.reconfigureLayout()
+        self.first_visible_line_index = 0
+        self.reconfigure_layout()
 
-    def reconfigureLayout(self) -> None:
-        self._actualWidth = (
+    def reconfigure_layout(self) -> None:
+        self._actual_width = (
             self._width
-            - self.textOffsetRight
-            - self.textOffsetLeft
-            - self.style.borderThickness * 2
+            - self.text_offset_right
+            - self.text_offset_left
+            - self.style.border_thickness * 2
         )
-        self._actualHeight = (
-            self._height - self.textOffsetTop - self.style.borderThickness * 2
+        self._actual_height = (
+            self._height - self.text_offset_top - self.style.border_thickness * 2
         )
-        self.lineHeight = self.style.fontSize
-        self._actualX = self._x + self.textOffsetLeft + self.style.borderThickness
-        self._actualY = self._y + self.textOffsetTop + self.style.borderThickness
+        self.line_height = self.style.font_size
+        self._actual_x = self._x + self.text_offset_left + self.style.border_thickness
+        self._actual_y = self._y + self.text_offset_top + self.style.border_thickness
 
-        self.maxVisibleLines = max(1, self._actualHeight // self.lineHeight)
+        self.max_visible_lines = max(1, self._actual_height // self.line_height)
 
-        self.setVisualLines()
+        self.set_visual_lines()
 
     def listen(self, events: list[pygame.event.Event]) -> None:
         if self._hidden or self._disabled:
             return
 
-        if self.keyDown:
-            self.updateRepeatEvent()
+        if self.key_down:
+            self.update_repeat_event()
 
-        self.handleMouse()
+        self.handle_mouse()
 
         if self.selected:
             for event in events:
                 if event.type == pygame.KEYDOWN:
-                    self.handleKeyDown(event)
+                    self.handle_key_down(event)
 
                 elif event.type == pygame.TEXTINPUT:
-                    self.handleTextInput(event)
+                    self.handle_text_input(event)
 
                 elif event.type == pygame.KEYUP:
                     if (
-                        self.repeatEvent is not None
-                        and self.repeatEvent.type == pygame.KEYDOWN
-                        and event.key == self.repeatEvent.key
+                        self.repeat_event is not None
+                        and self.repeat_event.type == pygame.KEYDOWN
+                        and event.key == self.repeat_event.key
                     ):
-                        self.repeatEvent = None
-                        self.keyDown = False
-                        self.firstRepeat = True
+                        self.repeat_event = None
+                        self.key_down = False
+                        self.first_repeat = True
 
-    def handleMouse(self) -> None:
-        mouseState = Mouse.getMouseState()
+    def handle_mouse(self) -> None:
+        mouse_state = Mouse.getMouseState()
         x, y = Mouse.getMousePos()
 
-        if mouseState == MouseState.CLICK:
-            self.processMouseClick(x, y)
+        if mouse_state == MouseState.CLICK:
+            self.process_mouse_click(x, y)
 
         if self.selected:
-            if mouseState == MouseState.DRAG:
-                self.processMouseDrag(x, y)
+            if mouse_state == MouseState.DRAG:
+                self.process_mouse_drag(x, y)
 
-            elif mouseState == MouseState.DOUBLE_CLICK:
-                self.processMouseDoubleClick()
+            elif mouse_state == MouseState.DOUBLE_CLICK:
+                self.process_mouse_double_click()
 
-            elif mouseState == MouseState.TRIPLE_CLICK:
-                self.processMouseTripleClick()
+            elif mouse_state == MouseState.TRIPLE_CLICK:
+                self.process_mouse_triple_click()
 
-        if mouseState == MouseState.WHEEL_MOTION and self.contains(x, y):
-            self.processMouseScroll()
+        if mouse_state == MouseState.WHEEL_MOTION and self.contains(x, y):
+            self.process_mouse_scroll()
 
-    def handleKeyDown(self, event: pygame.Event) -> None:
+    def handle_key_down(self, event: pygame.Event) -> None:
         if event.mod & pygame.KMOD_ALT:
             return
 
         now = pygame.time.get_ticks()
-        self.showCursor = True
-        self.cursorTime = now
-        self.keyDown = True
-        self.repeatEvent = event
-        self.repeatTime = now
+        self.show_cursor = True
+        self.cursor_time = now
+        self.key_down = True
+        self.repeat_event = event
+        self.repeat_time = now
 
         if event.key == pygame.K_BACKSPACE:
-            self.eraseText(event, direction=-1)
+            self.erase_text(event, direction=-1)
 
         elif event.key == pygame.K_DELETE:
-            self.eraseText(event, direction=1)
+            self.erase_text(event, direction=1)
 
         elif event.key == pygame.K_RETURN:
-            self.processReturn(event)
+            self.process_return(event)
 
         elif event.key == pygame.K_UP or (
             event.key == pygame.K_KP_8 and not event.mod & pygame.KMOD_NUM
         ):
-            self.moveCursorVertical(event, direction=-1)
+            self.move_cursor_vertical(event, direction=-1)
 
         elif event.key == pygame.K_DOWN or (
             event.key == pygame.K_KP_2 and not event.mod & pygame.KMOD_NUM
         ):
-            self.moveCursorVertical(event, direction=1)
+            self.move_cursor_vertical(event, direction=1)
 
         elif event.key == pygame.K_LEFT or (
             event.key == pygame.K_KP_4 and not event.mod & pygame.KMOD_NUM
         ):
-            self.moveCursorHorizontal(event, direction=-1)
+            self.move_cursor_horizontal(event, direction=-1)
 
         elif event.key == pygame.K_RIGHT or (
             event.key == pygame.K_KP_6 and not event.mod & pygame.KMOD_NUM
         ):
-            self.moveCursorHorizontal(event, direction=1)
+            self.move_cursor_horizontal(event, direction=1)
 
         elif event.key == pygame.K_HOME or (
             event.key == pygame.K_KP_7 and not event.mod & pygame.KMOD_NUM
         ):
-            self.jumpToEdge(event, direction=-1)
+            self.jump_to_edge(event, direction=-1)
 
         elif event.key == pygame.K_END or (
             event.key == pygame.K_KP_1 and not event.mod & pygame.KMOD_NUM
         ):
-            self.jumpToEdge(event, direction=1)
+            self.jump_to_edge(event, direction=1)
 
         elif event.key == pygame.K_a and event.mod & pygame.KMOD_CTRL:
-            self.selectAll()
+            self.select_all()
 
         elif event.key == pygame.K_c and event.mod & pygame.KMOD_CTRL:
             self.copy()
@@ -316,281 +314,283 @@ class TextBox(WidgetBase):
         elif event.key == pygame.K_INSERT or (
             event.key == pygame.K_KP_0 and not event.mod & pygame.KMOD_NUM
         ):
-            self.processInsert()
+            self.process_insert()
 
         elif event.key == pygame.K_ESCAPE:
             self.escape()
 
-    def handleTextInput(self, event: pygame.Event) -> None:
-        if not self.style.readOnly:
+    def handle_text_input(self, event: pygame.Event) -> None:
+        if not self.style.read_only:
             now = pygame.time.get_ticks()
-            self.showCursor = True
-            self.cursorTime = now
+            self.show_cursor = True
+            self.cursor_time = now
             if len(event.text) != 0:
-                self.addText(event.text)
+                self.add_text(event.text)
 
     def draw(self) -> None:
         if self._hidden:
             return
         if self.selected:
-            self.updateCursor()
-        self._drawBorder()
-        self._drawBackground()
-        self._drawSelection()
-        self._drawText()
-        self._drawCursor()
+            self.update_cursor()
+        self._draw_border()
+        self._draw_background()
+        self._draw_selection()
+        self._draw_text()
+        self._draw_cursor()
 
-    def _drawText(self) -> None:
-        if self.isEmptyText(self.text):
-            displayLines = [
+    def _draw_text(self) -> None:
+        # TODO: Fix bug with text_under_selection rendering
+        
+        if self.is_empty_text(self.text):
+            display_lines = [
                 VisualLine(
-                    text=self.placeholderText,
-                    lineIndex=0,
-                    startAt=0,
-                    prefixWidths=[0],
+                    text=self.placeholder_text,
+                    line_index=0,
+                    start_at=0,
+                    prefix_widths=[0],
                 )
             ]
-            colour = self.style.placeholderTextColour
+            color = self.style.placeholder_text_color
         else:
-            displayLines = self.cachedVisualLines
-            colour = self.style.textColour
+            display_lines = self.cached_visual_lines
+            color = self.style.text_color
 
-        if not self.isEmptySelection():
-            start, end = self.getNormalizedSelection()
+        if not self.is_empty_selection():
+            start, end = self.get_normalized_selection()
 
         for i in range(
-            self.firstVisibleLineIndex,
-            min(self.firstVisibleLineIndex + self.maxVisibleLines, len(displayLines)),
+            self.first_visible_line_index,
+            min(self.first_visible_line_index + self.max_visible_lines, len(display_lines)),
         ):
-            visualLine = displayLines[i]
+            visual_line = display_lines[i]
 
-            lineY = self._actualY + (i - self.firstVisibleLineIndex) * self.lineHeight
+            line_y = self._actual_y + (i - self.first_visible_line_index) * self.line_height
 
             if (
-                self.isEmptySelection()
-                or not start.line <= visualLine.lineIndex <= end.line
+                self.is_empty_selection()
+                or not start.line <= visual_line.line_index <= end.line
             ):
-                textSurface = self.getRenderedTextSurface(visualLine.text, colour)
-                self.win.blit(textSurface, (self._actualX, lineY))
+                text_surface = self.get_rendered_text_surface(visual_line.text, color)
+                self.win.blit(text_surface, (self._actual_x, line_y))
 
             else:
-                startColumn = start.column if visualLine.lineIndex == start.line else 0
-                endColumn = (
+                start_column = start.column if visual_line.line_index == start.line else 0
+                end_column = (
                     end.column
-                    if visualLine.lineIndex == end.line
-                    else len(self.text[visualLine.lineIndex])
+                    if visual_line.line_index == end.line
+                    else len(self.text[visual_line.line_index])
                 )
 
-                localStart = max(0, startColumn - visualLine.startAt)
-                localEnd = min(len(visualLine.text), endColumn - visualLine.startAt)
+                local_start = max(0, start_column - visual_line.start_at)
+                local_end = min(len(visual_line.text), end_column - visual_line.start_at)
 
-                textBeforeSelection = visualLine.text[:localStart]
-                textUnderSelection = visualLine.text[localStart:localEnd]
-                textAfterSelection = visualLine.text[localEnd:]
+                text_before_selection = visual_line.text[:local_start]
+                text_under_selection = visual_line.text[local_start:local_end]
+                text_after_selection = visual_line.text[local_end:]
 
-                if textBeforeSelection:
-                    textSurface = self.getRenderedTextSurface(
-                        textBeforeSelection, colour
+                if text_before_selection:
+                    text_surface = self.get_rendered_text_surface(
+                        text_before_selection, color
                     )
-                    self.win.blit(textSurface, (self._actualX, lineY))
+                    self.win.blit(text_surface, (self._actual_x, line_y))
 
-                if textUnderSelection:
-                    textSurface = self.getRenderedTextSurface(
-                        textUnderSelection, self.style.textColourUnderSelection
-                    )
-                    self.win.blit(
-                        textSurface,
-                        (self._actualX + visualLine.getOffset(localStart), lineY),
-                    )
-
-                if textAfterSelection:
-                    textSurface = self.getRenderedTextSurface(
-                        textAfterSelection, colour
+                if text_under_selection:
+                    text_surface = self.get_rendered_text_surface(
+                        text_under_selection, self.style.text_color_under_selection
                     )
                     self.win.blit(
-                        textSurface,
-                        (self._actualX + visualLine.getOffset(localEnd), lineY),
+                        text_surface,
+                        (self._actual_x + visual_line.get_offset(local_start), line_y),
                     )
 
-    def _drawCursor(self) -> None:
-        if self.selected and self.showCursor:
-            visualLineIndex = self.getVisualLineIndex(self.cursor)
+                if text_after_selection:
+                    text_surface = self.get_rendered_text_surface(
+                        text_after_selection, color
+                    )
+                    self.win.blit(
+                        text_surface,
+                        (self._actual_x + visual_line.get_offset(local_end), line_y),
+                    )
+
+    def _draw_cursor(self) -> None:
+        if self.selected and self.show_cursor:
+            visual_line_index = self.get_visual_line_index(self.cursor)
 
             if not (
-                self.firstVisibleLineIndex
-                <= visualLineIndex
-                < self.firstVisibleLineIndex + self.maxVisibleLines
+                self.first_visible_line_index
+                <= visual_line_index
+                < self.first_visible_line_index + self.max_visible_lines
             ):
                 return
 
-            if visualLineIndex != -1:
-                visualLine = self.cachedVisualLines[visualLineIndex]
+            if visual_line_index != -1:
+                visual_line = self.cached_visual_lines[visual_line_index]
 
-                localStart = self.cursor.column - visualLine.startAt
-                startX = self._actualX + visualLine.getOffset(localStart)
-                endX = startX
+                local_start = self.cursor.column - visual_line.start_at
+                start_x = self._actual_x + visual_line.get_offset(local_start)
+                end_x = start_x
 
-                startY = self._actualY + self.lineHeight * (
-                    visualLineIndex - self.firstVisibleLineIndex
+                start_y = self._actual_y + self.line_height * (
+                    visual_line_index - self.first_visible_line_index
                 )
-                endY = startY + self.lineHeight
+                end_y = start_y + self.line_height
 
-                if not self.insertOn:
+                if not self.insert_on:
                     pygame.draw.line(
                         self.win,
-                        self.style.cursorColour,
-                        (startX, startY),
-                        (endX, endY),
-                        self.style.cursorWidth,
+                        self.style.cursor_color,
+                        (start_x, start_y),
+                        (end_x, end_y),
+                        self.style.cursor_width,
                     )
                 else:
                     if self.cursor.column == len(self.text[self.cursor.line]):
-                        textSurface = self.getRenderedTextSurface(
-                            ' ', self.style.textColour
+                        text_surface = self.get_rendered_text_surface(
+                            ' ', self.style.text_color
                         )
                     else:
-                        textSurface = self.getRenderedTextSurface(
+                        text_surface = self.get_rendered_text_surface(
                             self.text[self.cursor.line][self.cursor.column],
-                            self.style.textColour,
+                            self.style.text_color,
                         )
-                    cursorSurface = pygame.Surface(textSurface.get_size())
-                    cursorSurface.fill(self.style.cursorColour)
-                    cursorSurface.set_alpha(self.style.cursorAlpha)
-                    self.win.blit(cursorSurface, (startX, startY))
+                    cursor_surface = pygame.Surface(text_surface.get_size())
+                    cursor_surface.fill(self.style.cursor_color)
+                    cursor_surface.set_alpha(self.style.cursor_alpha)
+                    self.win.blit(cursor_surface, (start_x, start_y))
 
-    def _drawBorder(self) -> None:
+    def _draw_border(self) -> None:
         pygame.draw.rect(
             self.win,
-            self.style.borderColour,
+            self.style.border_color,
             (self._x, self._y, self._width, self._height),
             border_radius=self.style.radius,
         )
 
-    def _drawBackground(self) -> None:
+    def _draw_background(self) -> None:
         rect = (
-            self._x + self.style.borderThickness,
-            self._y + self.style.borderThickness,
-            self._width - self.style.borderThickness * 2,
-            self._height - self.style.borderThickness * 2,
+            self._x + self.style.border_thickness,
+            self._y + self.style.border_thickness,
+            self._width - self.style.border_thickness * 2,
+            self._height - self.style.border_thickness * 2,
         )
         pygame.draw.rect(
-            self.win, self.style.colour, rect, border_radius=self.style.radius
+            self.win, self.style.color, rect, border_radius=self.style.radius
         )
 
-    def _drawSelection(self) -> None:
-        if self.isEmptySelection():
+    def _draw_selection(self) -> None:
+        if self.is_empty_selection():
             return
 
-        start, end = self.getNormalizedSelection()
+        start, end = self.get_normalized_selection()
 
         for i in range(
-            self.firstVisibleLineIndex,
+            self.first_visible_line_index,
             min(
-                self.firstVisibleLineIndex + self.maxVisibleLines,
-                len(self.cachedVisualLines),
+                self.first_visible_line_index + self.max_visible_lines,
+                len(self.cached_visual_lines),
             ),
         ):
-            visualLine = self.cachedVisualLines[i]
+            visual_line = self.cached_visual_lines[i]
 
-            lineIndex = visualLine.lineIndex
+            line_index = visual_line.line_index
 
-            if not (start.line <= lineIndex <= end.line):
+            if not (start.line <= line_index <= end.line):
                 continue
 
-            lineY = self._actualY + self.lineHeight * (i - self.firstVisibleLineIndex)
+            line_y = self._actual_y + self.line_height * (i - self.first_visible_line_index)
 
-            lineStart = visualLine.startAt
+            line_start = visual_line.start_at
 
-            selectionStart = start.column if lineIndex == start.line else 0
-            selectionEnd = (
-                end.column if lineIndex == end.line else len(self.text[lineIndex])
+            selection_start = start.column if line_index == start.line else 0
+            selection_end = (
+                end.column if line_index == end.line else len(self.text[line_index])
             )
 
-            localStart = max(0, selectionStart - lineStart)
-            localEnd = min(len(visualLine.text), selectionEnd - lineStart)
+            local_start = max(0, selection_start - line_start)
+            local_end = min(len(visual_line.text), selection_end - line_start)
 
-            if localStart > localEnd:
+            if local_start > local_end:
                 continue
 
-            isEmptyLine = len(self.text[lineIndex]) == 0
+            is_empty_line = len(self.text[line_index]) == 0
 
-            isEndOfLogicalLine = (
-                lineIndex < end.line
-                and localEnd == len(visualLine.text)
-                and visualLine.startAt + len(visualLine.text)
-                == len(self.text[lineIndex])
+            is_end_of_logical_line = (
+                line_index < end.line
+                and local_end == len(visual_line.text)
+                and visual_line.start_at + len(visual_line.text)
+                == len(self.text[line_index])
             )
 
-            if localStart == localEnd and not (isEmptyLine or isEndOfLogicalLine):
+            if local_start == local_end and not (is_empty_line or is_end_of_logical_line):
                 continue
 
-            textBeforeWidth = visualLine.getOffset(localStart)
-            textUpToEndWidth = visualLine.getOffset(localEnd)
+            text_before_width = visual_line.get_offset(local_start)
+            text_up_to_end_width = visual_line.get_offset(local_end)
 
-            textWidth = textUpToEndWidth - textBeforeWidth
+            text_width = text_up_to_end_width - text_before_width
 
-            if isEmptyLine or isEndOfLogicalLine:
-                textWidth += self.getTextWidth(' ')
+            if is_empty_line or is_end_of_logical_line:
+                text_width += self.get_text_width(' ')
 
             pygame.draw.rect(
                 self.win,
-                self.style.selectionColour,
-                (self._actualX + textBeforeWidth, lineY, textWidth, self.lineHeight),
+                self.style.selection_color,
+                (self._actual_x + text_before_width, line_y, text_width, self.line_height),
             )
 
-    def processMouseClick(self, x: int, y: int) -> None:
+    def process_mouse_click(self, x: int, y: int) -> None:
         if self.contains(x, y):
             now = pygame.time.get_ticks()
-            self.lastClickTime = now
+            self.last_click_time = now
 
             self.selected = True
-            self.showCursor = True
-            self.cursorTime = now
+            self.show_cursor = True
+            self.cursor_time = now
 
-            self.setCursorFromMouse(x, y)
-            self.resetSelection()
-            self.setPreferredColumn()
+            self.set_cursor_from_mouse(x, y)
+            self.reset_selection()
+            self.set_preferred_column()
         else:
             self.escape()
 
-    def processMouseDrag(self, x: int, y: int) -> None:
-        self.cursorTime = pygame.time.get_ticks()
-        self.setCursorFromMouse(x, y)
-        self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
-        self.setPreferredColumn()
+    def process_mouse_drag(self, x: int, y: int) -> None:
+        self.cursor_time = pygame.time.get_ticks()
+        self.set_cursor_from_mouse(x, y)
+        self.selection_end.set(self.cursor.line, self.cursor.column, self.text)
+        self.set_preferred_column()
 
-        if y < self._actualY:
-            self.firstVisibleLineIndex = max(0, self.firstVisibleLineIndex - 1)
-        elif y > self._actualY + self._actualHeight:
-            maxScroll = max(0, len(self.cachedVisualLines) - self.maxVisibleLines)
-            self.firstVisibleLineIndex = min(maxScroll, self.firstVisibleLineIndex + 1)
+        if y < self._actual_y:
+            self.first_visible_line_index = max(0, self.first_visible_line_index - 1)
+        elif y > self._actual_y + self._actual_height:
+            max_scroll = max(0, len(self.cached_visual_lines) - self.max_visible_lines)
+            self.first_visible_line_index = min(max_scroll, self.first_visible_line_index + 1)
 
-    def processMouseDoubleClick(self) -> None:
-        self.moveCursorWord(direction=-1)
-        self.selectionStart.set(self.cursor.line, self.cursor.column, self.text)
-        self.moveCursorWord(direction=1)
-        self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
+    def process_mouse_double_click(self) -> None:
+        self.move_cursor_word(direction=-1)
+        self.selection_start.set(self.cursor.line, self.cursor.column, self.text)
+        self.move_cursor_word(direction=1)
+        self.selection_end.set(self.cursor.line, self.cursor.column, self.text)
 
-    def processMouseTripleClick(self) -> None:
-        self.selectionStart.set(self.cursor.line, 0, self.text)
-        self.selectionEnd.set(
+    def process_mouse_triple_click(self) -> None:
+        self.selection_start.set(self.cursor.line, 0, self.text)
+        self.selection_end.set(
             self.cursor.line, len(self.text[self.cursor.line]), self.text
         )
 
-    def processMouseScroll(self) -> None:
-        self.firstVisibleLineIndex -= Mouse.getWheelDelta() * self.style.linesPerScroll
-        maxScroll = max(0, len(self.cachedVisualLines) - self.maxVisibleLines)
-        self.firstVisibleLineIndex = max(0, min(self.firstVisibleLineIndex, maxScroll))
+    def process_mouse_scroll(self) -> None:
+        self.first_visible_line_index -= Mouse.getWheelDelta() * self.style.lines_per_scroll
+        max_scroll = max(0, len(self.cached_visual_lines) - self.max_visible_lines)
+        self.first_visible_line_index = max(0, min(self.first_visible_line_index, max_scroll))
 
-    def processReturn(self, event: pygame.Event) -> None:
-        if self.style.readOnly:
+    def process_return(self, event: pygame.Event) -> None:
+        if self.style.read_only:
             return
         if event.mod & pygame.KMOD_SHIFT or event.mod & pygame.KMOD_CTRL:
-            self.addText('\n')
+            self.add_text('\n')
         else:
-            self.onSubmit(*self.onSubmitParams)
+            self.on_submit(*self.on_submit_params)
 
-    def processBackspace(self) -> None:
+    def process_backspace(self) -> None:
         if self.cursor.column > 0:
             self.text[self.cursor.line] = (
                 self.text[self.cursor.line][: self.cursor.column - 1]
@@ -598,64 +598,64 @@ class TextBox(WidgetBase):
             )
             self.cursor.set(self.cursor.line, self.cursor.column - 1, self.text)
 
-            self.setVisualLines()
-            self.setPreferredColumn()
-            self.onTextChanged(*self.onTextChangedParams)
+            self.set_visual_lines()
+            self.set_preferred_column()
+            self.on_text_changed(*self.on_text_changed_params)
 
         elif self.cursor.line > 0:
-            previousLineLength = len(self.text[self.cursor.line - 1])
+            previous_line_length = len(self.text[self.cursor.line - 1])
             self.text[self.cursor.line - 1] += self.text[self.cursor.line]
             self.text.pop(self.cursor.line)
-            self.cursor.set(self.cursor.line - 1, previousLineLength, self.text)
+            self.cursor.set(self.cursor.line - 1, previous_line_length, self.text)
 
-            self.setVisualLines()
-            self.setPreferredColumn()
-            self.onTextChanged(*self.onTextChangedParams)
+            self.set_visual_lines()
+            self.set_preferred_column()
+            self.on_text_changed(*self.on_text_changed_params)
 
-    def processDelete(self) -> None:
+    def process_delete(self) -> None:
         if self.cursor.column < len(self.text[self.cursor.line]):
             self.text[self.cursor.line] = (
                 self.text[self.cursor.line][: self.cursor.column]
                 + self.text[self.cursor.line][self.cursor.column + 1 :]
             )
 
-            self.setVisualLines()
-            self.setPreferredColumn()
-            self.onTextChanged(*self.onTextChangedParams)
+            self.set_visual_lines()
+            self.set_preferred_column()
+            self.on_text_changed(*self.on_text_changed_params)
 
         elif self.cursor.line < len(self.text) - 1:
             self.text[self.cursor.line] += self.text[self.cursor.line + 1]
             self.text.pop(self.cursor.line + 1)
 
-            self.setVisualLines()
-            self.setPreferredColumn()
-            self.onTextChanged(*self.onTextChangedParams)
+            self.set_visual_lines()
+            self.set_preferred_column()
+            self.on_text_changed(*self.on_text_changed_params)
 
-    def eraseText(self, event: pygame.Event, direction: Literal[-1, 1]) -> None:
-        if self.style.readOnly:
+    def erase_text(self, event: pygame.Event, direction: Literal[-1, 1]) -> None:
+        if self.style.read_only:
             return
 
-        if not self.isEmptySelection():
-            self.eraseSelectedText()
+        if not self.is_empty_selection():
+            self.erase_selected_text()
             return
 
         if event.mod & pygame.KMOD_CTRL:
-            self.selectionStart.set(self.cursor.line, self.cursor.column, self.text)
-            self.moveCursorWord(direction)
-            self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
-            self.eraseSelectedText()
+            self.selection_start.set(self.cursor.line, self.cursor.column, self.text)
+            self.move_cursor_word(direction)
+            self.selection_end.set(self.cursor.line, self.cursor.column, self.text)
+            self.erase_selected_text()
             return
 
         if direction == -1:
-            self.processBackspace()
+            self.process_backspace()
 
         elif direction == 1:
-            self.processDelete()
+            self.process_delete()
 
-        self.ensureCursorVisible()
+        self.ensure_cursor_visible()
 
-    def eraseSelectedText(self, callOnTextChanged: bool = True) -> None:
-        start, end = self.getNormalizedSelection()
+    def erase_selected_text(self, call_on_text_changed: bool = True) -> None:
+        start, end = self.get_normalized_selection()
 
         if start.line == end.line:
             self.text[start.line] = (
@@ -670,201 +670,201 @@ class TextBox(WidgetBase):
             del self.text[start.line + 1 : end.line + 1]
 
         self.cursor.set(start.line, start.column, self.text)
-        self.resetSelection()
+        self.reset_selection()
 
-        self.setVisualLines()
-        self.setPreferredColumn()
-        self.ensureCursorVisible()
-        if callOnTextChanged:
-            self.onTextChanged(*self.onTextChangedParams)
+        self.set_visual_lines()
+        self.set_preferred_column()
+        self.ensure_cursor_visible()
+        if call_on_text_changed:
+            self.on_text_changed(*self.on_text_changed_params)
 
-    def jumpToEdge(self, event: pygame.Event, direction: Literal[-1, 1]) -> None:
-        shiftPressed = bool(event.mod & pygame.KMOD_SHIFT)
+    def jump_to_edge(self, event: pygame.Event, direction: Literal[-1, 1]) -> None:
+        shift_pressed = bool(event.mod & pygame.KMOD_SHIFT)
 
-        if shiftPressed and self.isEmptySelection():
-            self.selectionStart.set(self.cursor.line, self.cursor.column, self.text)
+        if shift_pressed and self.is_empty_selection():
+            self.selection_start.set(self.cursor.line, self.cursor.column, self.text)
 
         if event.mod & pygame.KMOD_CTRL:
             line = 0 if direction == -1 else len(self.text) - 1
             column = 0 if direction == -1 else len(self.text[-1])
             self.cursor.set(line, column, self.text)
         else:
-            visualLineIndex = self.getVisualLineIndex(self.cursor)
-            if visualLineIndex != -1:
-                visualLine = self.cachedVisualLines[visualLineIndex]
-                column = visualLine.startAt
+            visual_line_index = self.get_visual_line_index(self.cursor)
+            if visual_line_index != -1:
+                visual_line = self.cached_visual_lines[visual_line_index]
+                column = visual_line.start_at
                 if direction == 1:
-                    column += len(visualLine.text)
+                    column += len(visual_line.text)
 
                 self.cursor.set(self.cursor.line, column, self.text)
 
         if event.mod & pygame.KMOD_SHIFT:
-            self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
+            self.selection_end.set(self.cursor.line, self.cursor.column, self.text)
         else:
-            self.resetSelection()
+            self.reset_selection()
 
-        self.setPreferredColumn()
-        self.ensureCursorVisible()
+        self.set_preferred_column()
+        self.ensure_cursor_visible()
 
-    def moveCursorVertical(
+    def move_cursor_vertical(
         self, event: pygame.Event, direction: Literal[-1, 1]
     ) -> None:
-        shiftPressed = bool(event.mod & pygame.KMOD_SHIFT)
+        shift_pressed = bool(event.mod & pygame.KMOD_SHIFT)
 
-        if shiftPressed and self.isEmptySelection():
-            self.selectionStart.set(self.cursor.line, self.cursor.column, self.text)
+        if shift_pressed and self.is_empty_selection():
+            self.selection_start.set(self.cursor.line, self.cursor.column, self.text)
 
-        baseCursor = Cursor(self.cursor.line, self.cursor.column)
-        if not shiftPressed and not self.isEmptySelection():
-            start, end = self.getNormalizedSelection()
-            baseCursor = start if direction == -1 else end
-            self.cursor.set(baseCursor.line, baseCursor.column, self.text)
-            self.resetSelection()
+        base_cursor = Cursor(self.cursor.line, self.cursor.column)
+        if not shift_pressed and not self.is_empty_selection():
+            start, end = self.get_normalized_selection()
+            base_cursor = start if direction == -1 else end
+            self.cursor.set(base_cursor.line, base_cursor.column, self.text)
+            self.reset_selection()
 
-        visualLineIndex = self.getVisualLineIndex(baseCursor)
-        if visualLineIndex == -1:
+        visual_line_index = self.get_visual_line_index(base_cursor)
+        if visual_line_index == -1:
             return
 
-        targetIndex = visualLineIndex + direction
+        target_index = visual_line_index + direction
 
-        if 0 <= targetIndex < len(self.cachedVisualLines):
-            targetLine = self.cachedVisualLines[targetIndex]
-            desiredColumn = min(
-                targetLine.startAt + self.cursor.preferredColumn,
-                targetLine.startAt + len(targetLine.text),
+        if 0 <= target_index < len(self.cached_visual_lines):
+            target_line = self.cached_visual_lines[target_index]
+            desired_column = min(
+                target_line.start_at + self.cursor.preferred_column,
+                target_line.start_at + len(target_line.text),
             )
-            self.cursor.set(targetLine.lineIndex, desiredColumn, self.text)
+            self.cursor.set(target_line.line_index, desired_column, self.text)
         else:
             if direction == -1:
                 self.cursor.set(self.cursor.line, 0, self.text)
             else:
-                currentLine = self.cachedVisualLines[visualLineIndex]
+                current_line = self.cached_visual_lines[visual_line_index]
                 self.cursor.set(
                     self.cursor.line,
-                    currentLine.startAt + len(currentLine.text),
+                    current_line.start_at + len(current_line.text),
                     self.text,
                 )
-            self.setPreferredColumn()
+            self.set_preferred_column()
 
-        if shiftPressed:
-            self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
+        if shift_pressed:
+            self.selection_end.set(self.cursor.line, self.cursor.column, self.text)
 
-        self.ensureCursorVisible()
+        self.ensure_cursor_visible()
 
-    def moveCursorHorizontal(
+    def move_cursor_horizontal(
         self, event: pygame.Event, direction: Literal[-1, 1]
     ) -> None:
-        shiftPressed = bool(event.mod & pygame.KMOD_SHIFT)
-        ctrlPressed = bool(event.mod & pygame.KMOD_CTRL)
+        shift_pressed = bool(event.mod & pygame.KMOD_SHIFT)
+        ctrl_pressed = bool(event.mod & pygame.KMOD_CTRL)
 
-        if not shiftPressed and not self.isEmptySelection():
-            start, end = self.getNormalizedSelection()
+        if not shift_pressed and not self.is_empty_selection():
+            start, end = self.get_normalized_selection()
             boundary = start if direction == -1 else end
             self.cursor.set(boundary.line, boundary.column, self.text)
-            self.resetSelection()
-            self.setPreferredColumn()
-            self.ensureCursorVisible()
+            self.reset_selection()
+            self.set_preferred_column()
+            self.ensure_cursor_visible()
             return
 
-        if shiftPressed and self.isEmptySelection():
-            self.selectionStart.set(self.cursor.line, self.cursor.column, self.text)
+        if shift_pressed and self.is_empty_selection():
+            self.selection_start.set(self.cursor.line, self.cursor.column, self.text)
 
-        if ctrlPressed:
-            self.moveCursorWord(direction)
+        if ctrl_pressed:
+            self.move_cursor_word(direction)
         else:
             line = self.cursor.line
-            col = self.cursor.column
+            column = self.cursor.column
 
             if direction == -1:
-                if col == 0 and line > 0:
+                if column == 0 and line > 0:
                     line -= 1
-                    col = len(self.text[line])
+                    column = len(self.text[line])
                 else:
-                    col = max(col - 1, 0)
+                    column = max(column - 1, 0)
             elif direction == 1:
-                if col == len(self.text[line]) and line < len(self.text) - 1:
+                if column == len(self.text[line]) and line < len(self.text) - 1:
                     line += 1
-                    col = 0
+                    column = 0
                 else:
-                    col += 1
+                    column += 1
 
-            self.cursor.set(line, col, self.text)
+            self.cursor.set(line, column, self.text)
 
-        if shiftPressed:
-            self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
+        if shift_pressed:
+            self.selection_end.set(self.cursor.line, self.cursor.column, self.text)
 
-        self.setPreferredColumn()
-        self.ensureCursorVisible()
+        self.set_preferred_column()
+        self.ensure_cursor_visible()
 
-    def selectAll(self) -> None:
-        self.selectionStart.set(0, 0, self.text)
-        self.selectionEnd.set(len(self.text) - 1, len(self.text[-1]), self.text)
+    def select_all(self) -> None:
+        self.selection_start.set(0, 0, self.text)
+        self.selection_end.set(len(self.text) - 1, len(self.text[-1]), self.text)
         self.cursor.set(len(self.text) - 1, len(self.text[-1]), self.text)
 
     def copy(self) -> None:
-        if not self.isEmptySelection():
-            pyperclip.copy(self.getSelectedText())
+        if not self.is_empty_selection():
+            pyperclip.copy(self.get_selected_text())
 
     def paste(self) -> None:
-        if not self.style.readOnly:
+        if not self.style.read_only:
             text = pyperclip.paste()
             if text:
-                self.addText(text)
+                self.add_text(text)
 
     def cut(self) -> None:
         self.copy()
-        if not self.style.readOnly and not self.isEmptySelection():
-            self.eraseSelectedText()
+        if not self.style.read_only and not self.is_empty_selection():
+            self.erase_selected_text()
 
-    def processInsert(self) -> None:
-        self.insertOn = not self.insertOn
+    def process_insert(self) -> None:
+        self.insert_on = not self.insert_on
 
-    def updateRepeatEvent(self) -> None:
-        if self.repeatEvent is None:
+    def update_repeat_event(self) -> None:
+        if self.repeat_event is None:
             return
 
         now = pygame.time.get_ticks()
 
-        if self.firstRepeat:
-            if now - self.repeatTime >= self.repeatDelay:
-                self.firstRepeat = False
-                self.repeatTime = now
-                self.handleKeyDown(self.repeatEvent)
+        if self.first_repeat:
+            if now - self.repeat_time >= self.repeat_delay:
+                self.first_repeat = False
+                self.repeat_time = now
+                self.handle_key_down(self.repeat_event)
 
-        elif now - self.repeatTime >= self.repeatInterval:
-            self.repeatTime = now
-            self.handleKeyDown(self.repeatEvent)
+        elif now - self.repeat_time >= self.repeat_interval:
+            self.repeat_time = now
+            self.handle_key_down(self.repeat_event)
 
-    def ensureCursorVisible(self) -> None:
-        visualLineIndex = self.getVisualLineIndex(self.cursor)
-        if visualLineIndex == -1:
+    def ensure_cursor_visible(self) -> None:
+        visual_line_index = self.get_visual_line_index(self.cursor)
+        if visual_line_index == -1:
             return
 
-        if visualLineIndex < self.firstVisibleLineIndex:
-            self.firstVisibleLineIndex = visualLineIndex
+        if visual_line_index < self.first_visible_line_index:
+            self.first_visible_line_index = visual_line_index
 
-        elif visualLineIndex >= self.firstVisibleLineIndex + self.maxVisibleLines:
-            self.firstVisibleLineIndex = visualLineIndex - self.maxVisibleLines + 1
+        elif visual_line_index >= self.first_visible_line_index + self.max_visible_lines:
+            self.first_visible_line_index = visual_line_index - self.max_visible_lines + 1
 
-        maxScroll = max(0, len(self.cachedVisualLines) - self.maxVisibleLines)
-        self.firstVisibleLineIndex = max(0, min(self.firstVisibleLineIndex, maxScroll))
+        max_scroll = max(0, len(self.cached_visual_lines) - self.max_visible_lines)
+        self.first_visible_line_index = max(0, min(self.first_visible_line_index, max_scroll))
 
-    def updateLayout(self) -> None:
-        self._actualHeight = (
-            self._height - self.textOffsetTop - self.style.borderThickness * 2
+    def update_layout(self) -> None:
+        self._actual_height = (
+            self._height - self.text_offset_top - self.style.border_thickness * 2
         )
 
-        self.maxVisibleLines = max(1, self._actualHeight // self.lineHeight)
+        self.max_visible_lines = max(1, self._actual_height // self.line_height)
 
-    def addText(self, text: str, callOnTextChanged: bool = True) -> None:
-        if not self.isEmptySelection():
-            self.eraseSelectedText(callOnTextChanged=False)
+    def add_text(self, text: str, call_on_text_changed: bool = True) -> None:
+        if not self.is_empty_selection():
+            self.erase_selected_text(call_on_text_changed=False)
 
-        text = str(text).replace('\t', ' ' * self.style.tabSpaces).replace('\r', '')
+        text = str(text).replace('\t', ' ' * self.style.tab_spaces).replace('\r', '')
         lines = text.split('\n')
 
-        if not self.insertOn:
-            rightPart = self.text[self.cursor.line][self.cursor.column :]
+        if not self.insert_on:
+            right_part = self.text[self.cursor.line][self.cursor.column :]
 
             for i, line in enumerate(lines):
                 self.text[self.cursor.line] = (
@@ -878,11 +878,11 @@ class TextBox(WidgetBase):
                     self.text.insert(self.cursor.line + 1, '')
                     self.cursor.set(self.cursor.line + 1, 0, self.text)
 
-            self.text[self.cursor.line] += rightPart
+            self.text[self.cursor.line] += right_part
 
         else:
             for i, line in enumerate(lines):
-                rightPart = self.text[self.cursor.line][
+                right_part = self.text[self.cursor.line][
                     self.cursor.column + len(line) :
                 ]
 
@@ -897,53 +897,53 @@ class TextBox(WidgetBase):
                     self.text.insert(self.cursor.line + 1, '')
                     self.cursor.set(self.cursor.line + 1, 0, self.text)
 
-                self.text[self.cursor.line] += rightPart
+                self.text[self.cursor.line] += right_part
 
-        self.setVisualLines()
-        self.setPreferredColumn()
-        self.ensureCursorVisible()
-        if callOnTextChanged:
-            self.onTextChanged(*self.onTextChangedParams)
+        self.set_visual_lines()
+        self.set_preferred_column()
+        self.ensure_cursor_visible()
+        if call_on_text_changed:
+            self.on_text_changed(*self.on_text_changed_params)
 
-    def getNormalizedSelection(self) -> tuple[Cursor, Cursor]:
-        if self.selectionStart > self.selectionEnd:
-            return self.selectionEnd, self.selectionStart
-        return self.selectionStart, self.selectionEnd
+    def get_normalized_selection(self) -> tuple[Cursor, Cursor]:
+        if self.selection_start > self.selection_end:
+            return self.selection_end, self.selection_start
+        return self.selection_start, self.selection_end
 
-    def setVisualLines(self) -> None:
+    def set_visual_lines(self) -> None:
         """Rebuild the soft-wrapped visual-line cache from ``self.text``.
 
         ``self.text`` stores logical lines split only by hard newlines. This
-        method derives ``cachedVisualLines`` for drawing, cursor navigation,
-        selection and scrolling. ``visualLineRanges`` maps each logical line
-        index to a half-open range in ``cachedVisualLines`` so lookups can scan
+        method derives ``cached_visual_lines`` for drawing, cursor navigation,
+        selection and scrolling. ``visual_line_ranges`` maps each logical line
+        index to a half-open range in ``cached_visual_lines`` so lookups can scan
         only that line's wrapped fragments.
 
         Call this after text changes, or after layout/font changes once the
         widget's text area measurements have been refreshed.
         """
-        self.cachedVisualLines = []
-        self.visualLineRanges = {}
+        self.cached_visual_lines = []
+        self.visual_line_ranges = {}
 
-        for lineIndex, line in enumerate(self.text):
-            rangeStart = len(self.cachedVisualLines)
+        for line_index, line in enumerate(self.text):
+            range_start = len(self.cached_visual_lines)
 
-            for visualLine in self._wrapLogicalLine(line, lineIndex):
-                self.cachedVisualLines.append(visualLine)
+            for visual_line in self._wrap_logical_line(line, line_index):
+                self.cached_visual_lines.append(visual_line)
 
-            rangeEnd = len(self.cachedVisualLines)
-            self.visualLineRanges[lineIndex] = (rangeStart, rangeEnd)
+            range_end = len(self.cached_visual_lines)
+            self.visual_line_ranges[line_index] = (range_start, range_end)
 
-        self.updateLayout()
+        self.update_layout()
 
-    def _wrapLogicalLine(self, line: str, lineIndex: int) -> list[VisualLine]:
+    def _wrap_logical_line(self, line: str, line_index: int) -> list[VisualLine]:
         """Soft-wrap a single logical line into ``VisualLine`` fragments.
 
         ``line`` is one entry of ``self.text``. The returned fragments are in
-        drawing order and all point back to ``lineIndex``; ``startAt`` stores
+        drawing order and all point back to ``line_index``; ``start_at`` stores
         the fragment's starting column in the original logical line.
 
-        The loop asks ``findVisualLineEnd`` for the largest substring that fits
+        The loop asks ``find_visual_line_end`` for the largest substring that fits
         in the text area. If there is more text after that point, it tries to
         move the break to the last space in the candidate window and keeps that
         space at the end of the current visual line. If no useful space exists,
@@ -956,75 +956,75 @@ class TextBox(WidgetBase):
 
         Args:
             line: Logical line text without its trailing newline.
-            lineIndex: Index of ``line`` inside ``self.text``.
+            line_index: Index of ``line`` inside ``self.text``.
 
         Returns:
             Visual-line fragments that cover the whole logical line.
         """
         if line == '':
-            return [self._makeVisualLine('', lineIndex, 0)]
+            return [self._make_visual_line('', line_index, 0)]
 
-        visualLines = []
+        visual_lines = []
         start = 0
 
         while start < len(line):
-            end = self.findVisualLineEnd(line, start)
+            end = self.find_visual_line_end(line, start)
 
             if end == len(line):
-                visualLines.append(
-                    self._makeVisualLine(line[start:end], lineIndex, start)
+                visual_lines.append(
+                    self._make_visual_line(line[start:end], line_index, start)
                 )
                 break
 
             if end == start:
                 end = start + 1
-                visualLines.append(
-                    self._makeVisualLine(line[start:end], lineIndex, start)
+                visual_lines.append(
+                    self._make_visual_line(line[start:end], line_index, start)
                 )
                 start = end
                 continue
 
-            lastSpace = line.rfind(' ', start, end + 1)
-            canWrapBySpace = lastSpace >= start and line[start:lastSpace].strip() != ''
+            last_space = line.rfind(' ', start, end + 1)
+            can_wrap_by_space = last_space >= start and line[start:last_space].strip() != ''
 
-            if canWrapBySpace:
-                visualLines.append(
-                    self._makeVisualLine(line[start : lastSpace + 1], lineIndex, start)
+            if can_wrap_by_space:
+                visual_lines.append(
+                    self._make_visual_line(line[start : last_space + 1], line_index, start)
                 )
-                start = lastSpace + 1
+                start = last_space + 1
             else:
-                visualLines.append(
-                    self._makeVisualLine(line[start:end], lineIndex, start)
+                visual_lines.append(
+                    self._make_visual_line(line[start:end], line_index, start)
                 )
                 start = end
 
-        return visualLines
+        return visual_lines
 
-    def _makeVisualLine(self, text: str, lineIndex: int, startAt: int) -> VisualLine:
+    def _make_visual_line(self, text: str, line_index: int, start_at: int) -> VisualLine:
         """Create a ``VisualLine`` and precompute cursor offsets for its text.
 
-        ``startAt`` is the column where ``text`` begins inside the original
-        logical line. ``prefixWidths`` has one more entry than ``text``: index 0
+        ``start_at`` is the column where ``text`` begins inside the original
+        logical line. ``prefix_widths`` has one more entry than ``text``: index 0
         is the left edge, and every later index is the x offset after that many
         characters. The drawing and hit-testing paths use those offsets instead
         of remeasuring the same substrings repeatedly.
 
         Args:
             text: Text displayed by this visual line fragment.
-            lineIndex: Index of the source logical line in ``self.text``.
-            startAt: Starting column of ``text`` in the source logical line.
+            line_index: Index of the source logical line in ``self.text``.
+            start_at: Starting column of ``text`` in the source logical line.
 
         Returns:
             A ``VisualLine`` with precomputed prefix widths.
         """
         return VisualLine(
             text=text,
-            lineIndex=lineIndex,
-            startAt=startAt,
-            prefixWidths=self.buildPrefixWidths(text),
+            line_index=line_index,
+            start_at=start_at,
+            prefix_widths=self.build_prefix_widths(text),
         )
 
-    def findVisualLineEnd(self, line: str, start: int) -> int:
+    def find_visual_line_end(self, line: str, start: int) -> int:
         """Return the exclusive end column of the widest substring that fits.
 
         The search checks candidate end columns with binary search. ``low`` is
@@ -1034,7 +1034,7 @@ class TextBox(WidgetBase):
         ``line[start:return_value]`` is the measured fragment.
 
         If the first character is already too wide, no candidate slice is
-        accepted and the method returns ``start``. ``_wrapLogicalLine`` handles
+        accepted and the method returns ``start``. ``_wrap_logical_line`` handles
         that case by emitting one character anyway, which guarantees progress.
 
         Args:
@@ -1048,25 +1048,25 @@ class TextBox(WidgetBase):
         high = len(line) + 1
 
         while low + 1 < high:
-            candidateEnd = (low + high) // 2
-            if self.getTextWidth(line[start:candidateEnd]) <= self._actualWidth:
-                low = candidateEnd
+            candidate_end = (low + high) // 2
+            if self.get_text_width(line[start:candidate_end]) <= self._actual_width:
+                low = candidate_end
             else:
-                high = candidateEnd
+                high = candidate_end
 
         return low
 
-    def resetSelection(self) -> None:
-        self.selectionStart.set(self.cursor.line, self.cursor.column, self.text)
-        self.selectionEnd.set(self.cursor.line, self.cursor.column, self.text)
+    def reset_selection(self) -> None:
+        self.selection_start.set(self.cursor.line, self.cursor.column, self.text)
+        self.selection_end.set(self.cursor.line, self.cursor.column, self.text)
 
-    def getVisualLineIndex(self, cursor: Cursor) -> int:
+    def get_visual_line_index(self, cursor: Cursor) -> int:
         """Find the cached visual line that contains ``cursor``.
 
-        The lookup first narrows the scan with ``visualLineRanges`` for the
+        The lookup first narrows the scan with ``visual_line_ranges`` for the
         cursor's logical line. Cursor columns are logical-line columns, so each
         visual fragment is matched by
-        ``startAt <= column <= startAt + len(text)``.
+        ``start_at <= column <= start_at + len(text)``.
 
         When the cursor sits exactly at the end of a wrapped fragment and
         another fragment from the same logical line follows, this returns the
@@ -1077,55 +1077,55 @@ class TextBox(WidgetBase):
             cursor: Logical cursor position to locate.
 
         Returns:
-            Index in ``cachedVisualLines``, or -1 if no matching visual line is
+            Index in ``cached_visual_lines``, or -1 if no matching visual line is
             cached.
         """
-        startIndex, endIndex = self.visualLineRanges.get(
-            cursor.line, (0, len(self.cachedVisualLines))
+        start_index, end_index = self.visual_line_ranges.get(
+            cursor.line, (0, len(self.cached_visual_lines))
         )
 
-        for lineIndex in range(startIndex, endIndex):
-            visualLine = self.cachedVisualLines[lineIndex]
-            if visualLine.lineIndex != cursor.line:
+        for line_index in range(start_index, end_index):
+            visual_line = self.cached_visual_lines[line_index]
+            if visual_line.line_index != cursor.line:
                 continue
 
-            lineWidth = visualLine.startAt + len(visualLine.text)
-            if visualLine.startAt <= cursor.column <= lineWidth:
+            line_width = visual_line.start_at + len(visual_line.text)
+            if visual_line.start_at <= cursor.column <= line_width:
                 if (
-                    cursor.column == lineWidth != 0
-                    and lineIndex + 1 < len(self.cachedVisualLines)
-                    and self.cachedVisualLines[lineIndex + 1].lineIndex == cursor.line
+                    cursor.column == line_width != 0
+                    and line_index + 1 < len(self.cached_visual_lines)
+                    and self.cached_visual_lines[line_index + 1].line_index == cursor.line
                 ):
-                    return lineIndex + 1
-                return lineIndex
+                    return line_index + 1
+                return line_index
         return -1
 
-    def getTextWidth(self, text: str, style: int = 0) -> int:
-        cacheKey = (text, style)
+    def get_text_width(self, text: str, style: int = 0) -> int:
+        cache_key = (text, style)
 
-        if cacheKey in self._widthCache:
-            self._widthCache.move_to_end(cacheKey)
-            return self._widthCache[cacheKey]
+        if cache_key in self._width_cache:
+            self._width_cache.move_to_end(cache_key)
+            return self._width_cache[cache_key]
 
-        if len(self._widthCache) >= self.WIDTH_CACHE_SIZE:
-            self._widthCache.popitem(last=False)
+        if len(self._width_cache) >= self.WIDTH_CACHE_SIZE:
+            self._width_cache.popitem(last=False)
 
         width = self.font.get_rect(text, style=style).width
-        self._widthCache[cacheKey] = width
+        self._width_cache[cache_key] = width
 
         return width
 
-    def buildPrefixWidths(self, text: str) -> list[int]:
+    def build_prefix_widths(self, text: str) -> list[int]:
         """Build x offsets for every cursor position inside ``text``.
 
         The returned list always starts with 0 and contains one entry per cursor
         position, including the position after the last character. For example,
-        ``prefixWidths[3]`` is the pixel offset after the first three
+        ``prefix_widths[3]`` is the pixel offset after the first three
         characters.
 
         Most characters use freetype glyph advance from ``get_metrics``. If
         metrics are missing for a character, the code falls back to measuring
-        that character through ``getTextWidth``.
+        that character through ``get_text_width``.
 
         Args:
             text: Visual-line text whose cursor offsets should be measured.
@@ -1140,165 +1140,165 @@ class TextBox(WidgetBase):
             if glyph:
                 cumulative += int(glyph[4])
             else:
-                cumulative += self.getTextWidth(text[i])
+                cumulative += self.get_text_width(text[i])
             widths.append(cumulative)
         return widths
 
-    def getRenderedTextSurface(
+    def get_rendered_text_surface(
         self,
         text: str,
-        colour: ColorLike,
+        color: ColorLike,
         style: int = 0,
     ) -> pygame.Surface:
-        cacheKey = (text, colour, style)
+        cache_key = (text, color, style)
 
-        if cacheKey in self._renderedTextCache:
-            self._renderedTextCache.move_to_end(cacheKey)
-            return self._renderedTextCache[cacheKey]
+        if cache_key in self._rendered_text_cache:
+            self._rendered_text_cache.move_to_end(cache_key)
+            return self._rendered_text_cache[cache_key]
 
-        if len(self._renderedTextCache) >= self.RENDER_CACHE_SIZE:
-            self._renderedTextCache.popitem(last=False)
+        if len(self._rendered_text_cache) >= self.RENDER_CACHE_SIZE:
+            self._rendered_text_cache.popitem(last=False)
 
-        rendered = self.font.render(text, fgcolor=colour, style=style)[0]
-        self._renderedTextCache[cacheKey] = rendered
+        rendered = self.font.render(text, fgcolor=color, style=style)[0]
+        self._rendered_text_cache[cache_key] = rendered
         return rendered
 
-    def updateCursor(self) -> None:
+    def update_cursor(self) -> None:
         now = pygame.time.get_ticks()
-        if now - self.cursorTime >= self.cursorInterval:
-            self.showCursor = not self.showCursor
-            self.cursorTime = now
+        if now - self.cursor_time >= self.cursor_interval:
+            self.show_cursor = not self.show_cursor
+            self.cursor_time = now
 
-    def isEmptyText(self, text: list[str]) -> bool:
+    def is_empty_text(self, text: list[str]) -> bool:
         return len(text) == 1 and text[0] == ''
 
-    def isWordChar(self, character: str) -> bool:
+    def is_word_char(self, character: str) -> bool:
         return character.isalnum() or character == '_'
 
-    def isEmptySelection(self) -> bool:
-        return (self.selectionStart.line, self.selectionStart.column) == (
-            self.selectionEnd.line,
-            self.selectionEnd.column,
+    def is_empty_selection(self) -> bool:
+        return (self.selection_start.line, self.selection_start.column) == (
+            self.selection_end.line,
+            self.selection_end.column,
         )
 
     def escape(self) -> None:
-        self.repeatEvent = None
-        self.keyDown = False
-        self.firstRepeat = True
+        self.repeat_event = None
+        self.key_down = False
+        self.first_repeat = True
         self.selected = False
-        self.showCursor = False
-        self.resetSelection()
+        self.show_cursor = False
+        self.reset_selection()
 
-    def setText(self, text: str) -> None:
+    def set_text(self, text: str) -> None:
         self.text = ['']
         self.cursor.set(0, 0, self.text)
-        self.resetSelection()
-        self.addText(text, callOnTextChanged=False)
+        self.reset_selection()
+        self.add_text(text, call_on_text_changed=False)
 
-    def setPreferredColumn(self) -> None:
+    def set_preferred_column(self) -> None:
         """Remember the cursor's visual-column target for vertical movement.
 
         Horizontal movement and mouse placement update this value. Up/down
         movement then tries to keep the same local column inside the next visual
         line, clamping only when that target line is shorter.
         """
-        visualLineIndex = self.getVisualLineIndex(self.cursor)
+        visual_line_index = self.get_visual_line_index(self.cursor)
 
-        if visualLineIndex != -1:
-            visualLine = self.cachedVisualLines[visualLineIndex]
-            relativeColumn = self.cursor.column - visualLine.startAt
+        if visual_line_index != -1:
+            visual_line = self.cached_visual_lines[visual_line_index]
+            local_column = self.cursor.column - visual_line.start_at
 
-            self.cursor.preferredColumn = relativeColumn
+            self.cursor.preferred_column = local_column
 
-    def moveCursorWord(self, direction: Literal[-1, 1]) -> None:
+    def move_cursor_word(self, direction: Literal[-1, 1]) -> None:
         line = self.cursor.line
-        col = self.cursor.column
-        currentLine = self.text[line]
+        column = self.cursor.column
+        current_line = self.text[line]
 
-        if direction == -1 and col == 0 and line > 0:
+        if direction == -1 and column == 0 and line > 0:
             line -= 1
-            currentLine = self.text[line]
-            col = len(currentLine)
-        elif direction == 1 and col == len(currentLine) and line < len(self.text) - 1:
+            current_line = self.text[line]
+            column = len(current_line)
+        elif direction == 1 and column == len(current_line) and line < len(self.text) - 1:
             line += 1
-            currentLine = self.text[line]
-            col = 0
+            current_line = self.text[line]
+            column = 0
 
         offset = -1 if direction == -1 else 0
-        while 0 <= col + offset < len(currentLine) and not self.isWordChar(
-            currentLine[col + offset]
+        while 0 <= column + offset < len(current_line) and not self.is_word_char(
+            current_line[column + offset]
         ):
-            col += direction
+            column += direction
 
-        while 0 <= col + offset < len(currentLine) and self.isWordChar(
-            currentLine[col + offset]
+        while 0 <= column + offset < len(current_line) and self.is_word_char(
+            current_line[column + offset]
         ):
-            col += direction
+            column += direction
 
-        self.cursor.set(line, col, self.text)
+        self.cursor.set(line, column, self.text)
 
-    def setCursorFromMouse(self, mouseX: int, mouseY: int) -> None:
+    def set_cursor_from_mouse(self, mouse_x: int, mouse_y: int) -> None:
         """Move the cursor to the text position closest to a mouse coordinate.
 
         The y coordinate selects a visible ``VisualLine`` after clamping to the
         text area. The x coordinate is compared with midpoint positions between
         adjacent prefix widths, which chooses the nearest insertion column
         inside that visual fragment. The final cursor column is converted back
-        to a logical-line column by adding ``visualLine.startAt``.
+        to a logical-line column by adding ``visual_line.start_at``.
 
         Args:
-            mouseX: Mouse x coordinate in window space.
-            mouseY: Mouse y coordinate in window space.
+            mouse_x: Mouse x coordinate in window space.
+            mouse_y: Mouse y coordinate in window space.
         """
-        if not self.cachedVisualLines:
+        if not self.cached_visual_lines:
             return
 
-        clampedY = max(
-            self._actualY, min(mouseY, self._actualY + self._actualHeight - 1)
+        clamped_y = max(
+            self._actual_y, min(mouse_y, self._actual_y + self._actual_height - 1)
         )
 
-        rawIndex = (
-            self.firstVisibleLineIndex + (clampedY - self._actualY) // self.lineHeight
+        raw_index = (
+            self.first_visible_line_index + (clamped_y - self._actual_y) // self.line_height
         )
-        visualLineIndex = max(
-            self.firstVisibleLineIndex,
+        visual_line_index = max(
+            self.first_visible_line_index,
             min(
-                rawIndex,
-                self.firstVisibleLineIndex + self.maxVisibleLines - 1,
-                len(self.cachedVisualLines) - 1,
+                raw_index,
+                self.first_visible_line_index + self.max_visible_lines - 1,
+                len(self.cached_visual_lines) - 1,
             ),
         )
 
-        visualLine = self.cachedVisualLines[visualLineIndex]
+        visual_line = self.cached_visual_lines[visual_line_index]
 
-        if visualLine.lineIndex != self.cursor.line:
-            self.cursor.set(visualLine.lineIndex, self.cursor.column, self.text)
+        if visual_line.line_index != self.cursor.line:
+            self.cursor.set(visual_line.line_index, self.cursor.column, self.text)
 
-        if len(visualLine.text) == 0:
-            self.cursor.set(self.cursor.line, visualLine.startAt, self.text)
+        if len(visual_line.text) == 0:
+            self.cursor.set(self.cursor.line, visual_line.start_at, self.text)
             return
 
-        relativeX = mouseX - self._actualX
-        prefixWidths = visualLine.prefixWidths
-        relativeColumn = len(visualLine.text)
+        relative_x = mouse_x - self._actual_x
+        prefix_widths = visual_line.prefix_widths
+        local_column = len(visual_line.text)
 
-        for column in range(len(visualLine.text)):
-            midpoint = (prefixWidths[column] + prefixWidths[column + 1]) / 2
-            if relativeX < midpoint:
-                relativeColumn = column
+        for column in range(len(visual_line.text)):
+            midpoint = (prefix_widths[column] + prefix_widths[column + 1]) / 2
+            if relative_x < midpoint:
+                local_column = column
                 break
 
         self.cursor.set(
             self.cursor.line,
-            visualLine.startAt + relativeColumn,
+            visual_line.start_at + local_column,
             self.text,
         )
 
-    def getText(self) -> str:
+    def get_text(self) -> str:
         return '\n'.join(self.text)
 
-    def getSelectedText(self) -> str:
-        start, end = self.getNormalizedSelection()
+    def get_selected_text(self) -> str:
+        start, end = self.get_normalized_selection()
 
         if start.line == end.line:
             return self.text[start.line][start.column : end.column]
@@ -1316,42 +1316,42 @@ class TextBox(WidgetBase):
 
     def set(self, attr: str, value: int) -> None:
         super().set(attr, value)
-        self.reconfigureLayout()
+        self.reconfigure_layout()
 
-    def setX(self, x: int) -> None:
-        super().setX(x)
-        self.reconfigureLayout()
+    def set_x(self, x: int) -> None:
+        super().set_x(x)
+        self.reconfigure_layout()
 
-    def setY(self, y: int) -> None:
-        super().setY(y)
-        self.reconfigureLayout()
+    def set_y(self, y: int) -> None:
+        super().set_y(y)
+        self.reconfigure_layout()
 
-    def setWidth(self, width: int) -> None:
-        super().setWidth(width)
-        self.reconfigureLayout()
+    def set_width(self, width: int) -> None:
+        super().set_width(width)
+        self.reconfigure_layout()
 
-    def setHeight(self, height: int) -> None:
-        super().setHeight(height)
-        self.reconfigureLayout()
+    def set_height(self, height: int) -> None:
+        super().set_height(height)
+        self.reconfigure_layout()
 
 
 if __name__ == '__main__':
 
     def output():
-        print(textbox.getText())
-        textbox.setText('')
+        print(textbox.get_text())
+        textbox.set_text('')
 
     pygame.init()
     win = pygame.display.set_mode((1000, 600))
 
     clock = pygame.time.Clock()
 
-    # modernDarkTheme = TextBoxStyle(
-    #     colour=(30, 30, 30), textColour=(240, 240, 240), fontSize=24
+    # dark_theme = TextBoxStyle(
+    #     color=(30, 30, 30), text_color=(240, 240, 240), font_size=24
     # )
 
-    # inputLogin = TextBox(win, 100, 100, 400, 50, style=modernDarkTheme)
-    # inputPassword = TextBox(win, 100, 200, 400, 50, style=modernDarkTheme)
+    # input_login = TextBox(win, 100, 100, 400, 50, style=dark_theme)
+    # input_password = TextBox(win, 100, 200, 400, 50, style=dark_theme)
 
     textbox = TextBox(
         win,
@@ -1359,31 +1359,31 @@ if __name__ == '__main__':
         y=100,
         width=800,
         height=400,
-        fontSize=50,
-        borderColour=(255, 0, 0),
-        textColour=(0, 200, 0),
-        onSubmit=output,
+        font_size=50,
+        border_color=(255, 0, 0),
+        text_color=(0, 200, 0),
+        on_submit=output,
         radius=10,
-        borderThickness=5,
-        placeholderText='Enter something:',
+        border_thickness=5,
+        placeholder_text='Enter something:',
     )
 
     run = True
     while run:
-        outerEvents = pygame.event.get()
-        for outerEvent in outerEvents:
-            if outerEvent.type == pygame.QUIT:
+        outer_events = pygame.event.get()
+        for outer_event in outer_events:
+            if outer_event.type == pygame.QUIT:
                 pygame.quit()
                 run = False
                 sys.exit()
-            # elif outerEvent.type == pygame.KEYDOWN:
-            #     if outerEvent.key == pygame.K_k:
-            #         modernDarkTheme.colour = (255, 255, 255)
-            #         modernDarkTheme.textColour = (0, 0, 0)
+            # elif outer_event.type == pygame.KEYDOWN:
+            #     if outer_event.key == pygame.K_k:
+            #         dark_theme.color = (255, 255, 255)
+            #         dark_theme.text_color = (0, 0, 0)
 
         win.fill((255, 255, 255))
 
-        pygame_widgets.update(outerEvents)
+        pygame_widgets.update(outer_events)
         pygame.display.update()
 
         clock.tick(60)

@@ -209,7 +209,7 @@ class Mouse:
         Mouse._multiClickRadius = max(0, pixels)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     pygame.init()
     win = pygame.display.set_mode((600, 600))
 

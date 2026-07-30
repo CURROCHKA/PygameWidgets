@@ -10,15 +10,15 @@ class Toggle(WidgetBase):
     def __init__(self, win, x, y, width, height, **kwargs):
         super().__init__(win, x, y, width, height)
 
-        self.value = kwargs.get('startOn', False)
-        self.onColour = kwargs.get('onColour', (141, 185, 244))
-        self.offColour = kwargs.get('offColour', (150, 150, 150))
-        self.handleOnColour = kwargs.get('handleOnColour', (26, 115, 232))
-        self.handleOffColour = kwargs.get('handleOffColour', (200, 200, 200))
-        self.onClick = kwargs.get('onClick', lambda *args: None)
-        self.onClickParams = kwargs.get('onClickParams', ())
+        self.value = kwargs.get("startOn", False)
+        self.onColour = kwargs.get("onColour", (141, 185, 244))
+        self.offColour = kwargs.get("offColour", (150, 150, 150))
+        self.handleOnColour = kwargs.get("handleOnColour", (26, 115, 232))
+        self.handleOffColour = kwargs.get("handleOffColour", (200, 200, 200))
+        self.onClick = kwargs.get("onClick", lambda *args: None)
+        self.onClickParams = kwargs.get("onClickParams", ())
 
-        self.handleRadius = kwargs.get('handleRadius', int(self._height / 1.3))
+        self.handleRadius = kwargs.get("handleRadius", int(self._height / 1.3))
         self.radius = self._height // 2
 
         self.colour = self.onColour if self.value else self.offColour
@@ -41,26 +41,43 @@ class Toggle(WidgetBase):
 
     def draw(self):
         if not self._hidden:
-            pygame.draw.rect(self.win, self.colour, (self._x, self._y, self._width, self._height))
-
-            pygame.draw.circle(self.win, self.colour, (self._x, self._y + self._height // 2), self.radius)
-            pygame.draw.circle(self.win, self.colour, (self._x + self._width, self._y + self._height // 2), self.radius)
-
-            circle = (
-                self._x + (
-                    self._width - self.handleRadius + self.radius if self.value else self.handleRadius - self.radius
-                ),
-                self._y + self._height // 2
+            pygame.draw.rect(
+                self.win, self.colour, (self._x, self._y, self._width, self._height)
             )
 
-            gfxdraw.filled_circle(self.win, *circle, self.handleRadius, self.handleColour)
+            pygame.draw.circle(
+                self.win,
+                self.colour,
+                (self._x, self._y + self._height // 2),
+                self.radius,
+            )
+            pygame.draw.circle(
+                self.win,
+                self.colour,
+                (self._x + self._width, self._y + self._height // 2),
+                self.radius,
+            )
+
+            circle = (
+                self._x
+                + (
+                    self._width - self.handleRadius + self.radius
+                    if self.value
+                    else self.handleRadius - self.radius
+                ),
+                self._y + self._height // 2,
+            )
+
+            gfxdraw.filled_circle(
+                self.win, *circle, self.handleRadius, self.handleColour
+            )
             gfxdraw.aacircle(self.win, *circle, self.handleRadius, self.handleColour)
 
     def getValue(self) -> bool:
         return self.value
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     pygame.init()
     win = pygame.display.set_mode((1000, 600))
 

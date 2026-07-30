@@ -47,7 +47,7 @@ class OrderedSet(MutableSet):
         """Move *value* to the start of the iteration order."""
         self._od.move_to_end(value, last=False)
 
-    def copy(self) -> 'OrderedSet':
+    def copy(self) -> "OrderedSet":
         """Return a shallow copy of the set."""
         return OrderedSet(values=self._od.keys())
 
@@ -131,7 +131,7 @@ class WidgetBase(ABC):
         pass
 
     def __repr__(self) -> str:
-        return f'{type(self).__name__}(x = {self._x}, y = {self._y}, width = {self._width}, height = {self._height})'
+        return f"{type(self).__name__}(x = {self._x}, y = {self._y}, width = {self._width}, height = {self._height})"
 
     def contains(self, x: int | float, y: int | float) -> bool:
         """Return whether a point lies inside the widget bounds.
@@ -200,13 +200,13 @@ class WidgetBase(ABC):
         Returns:
             Attribute value, or ``None`` when the attribute is not supported.
         """
-        if attr == 'x':
+        if attr == "x":
             return self._x
-        elif attr == 'y':
+        elif attr == "y":
             return self._y
-        elif attr == 'width':
+        elif attr == "width":
             return self._width
-        elif attr == 'height':
+        elif attr == "height":
             return self._height
 
     def getX(self) -> int | float:
@@ -245,13 +245,13 @@ class WidgetBase(ABC):
             attr: Attribute name to update.
             value: New attribute value.
         """
-        if attr == 'x':
+        if attr == "x":
             self._x = value
-        elif attr == 'y':
+        elif attr == "y":
             self._y = value
-        elif attr == 'width':
+        elif attr == "width":
             self._width = value
-        elif attr == 'height':
+        elif attr == "height":
             self._height = value
 
     def setX(self, x: int | float) -> None:
@@ -331,7 +331,7 @@ class WidgetHandler:
             WidgetHandler._widgets.remove(widget)
         except KeyError:
             print(
-                f'Error: Tried to remove {widget} when {widget} not in WidgetHandler.'
+                f"Error: Tried to remove {widget} when {widget} not in WidgetHandler."
             )
 
     @staticmethod
@@ -341,7 +341,7 @@ class WidgetHandler:
             WidgetHandler._widgets.move_to_end(widget)
         except KeyError:
             print(
-                f'Error: Tried to move {widget} to top when {widget} not in WidgetHandler.'
+                f"Error: Tried to move {widget} to top when {widget} not in WidgetHandler."
             )
 
     @staticmethod
@@ -351,7 +351,7 @@ class WidgetHandler:
             WidgetHandler._widgets.move_to_start(widget)
         except KeyError:
             print(
-                f'Error: Tried to move {widget} to bottom when {widget} not in WidgetHandler.'
+                f"Error: Tried to move {widget} to bottom when {widget} not in WidgetHandler."
             )
 
     @staticmethod

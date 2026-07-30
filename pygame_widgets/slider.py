@@ -53,7 +53,7 @@ class Slider(WidgetBase):
         else:
             self.style = replace(style, **styleKwargs)
 
-        initialValue = kwargs.get('initial', (self.style.max + self.style.min) / 2)
+        initialValue = kwargs.get("initial", (self.style.max + self.style.min) / 2)
         self.value = self.round(initialValue)
         self.value = max(min(self.value, self.style.max), self.style.min)
 
@@ -106,7 +106,8 @@ class Slider(WidgetBase):
                     self.value = max(min(self.value, self.style.max), self.style.min)
                 else:
                     self.value = self.round(
-                        (x - self._x) / self._width * (self.style.max - self.style.min) + self.style.min
+                        (x - self._x) / self._width * (self.style.max - self.style.min)
+                        + self.style.min
                     )
                     self.value = max(min(self.value, self.style.max), self.style.min)
 
@@ -162,18 +163,24 @@ class Slider(WidgetBase):
                     self.handleRadius * 2,
                     self.handleRadius * 2,
                 ),
-                border_radius=self.handleBorderRadius
+                border_radius=self.handleBorderRadius,
             )
 
     def contains(self, x: int, y: int) -> bool:
         if self.style.vertical:
             handleX = self._x + self._width // 2
             handleY = int(
-                self._y + (self.style.max - self.value) / (self.style.max - self.style.min) * self._height
+                self._y
+                + (self.style.max - self.value)
+                / (self.style.max - self.style.min)
+                * self._height
             )
         else:
             handleX = int(
-                self._x + (self.value - self.style.min) / (self.style.max - self.style.min) * self._width
+                self._x
+                + (self.value - self.style.min)
+                / (self.style.max - self.style.min)
+                * self._width
             )
             handleY = self._y + self._height // 2
 
@@ -197,7 +204,7 @@ class Slider(WidgetBase):
         self.value = value
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     from pygame_widgets.textbox import TextBox
 
     pygame.init()

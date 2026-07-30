@@ -30,11 +30,11 @@ class AnimationBase:
             value = self.widget.get(param)
             if value is None:
                 raise InvalidParameter(
-                    f'The parameter <{param}> is not a valid attribute of type {type(self.widget)}'
+                    f"The parameter <{param}> is not a valid attribute of type {type(self.widget)}"
                 )
             elif type(value) != type(target):
                 raise InvalidParameterType(
-                    f'Expected parameter <{param}> to be of type {type(value)} but found type {type(target)}'
+                    f"Expected parameter <{param}> to be of type {type(value)} but found type {type(target)}"
                 )
 
     def start(self):
@@ -70,7 +70,9 @@ class AnimationBase:
             for param, initialTuple in initialTupleParams.items():
                 target = self.params[param]
                 newValue = tuple(
-                    initialTuple[i] + step * (target[i] - initialTuple[i]) for i in range(len(initialTuple)))
+                    initialTuple[i] + step * (target[i] - initialTuple[i])
+                    for i in range(len(initialTuple))
+                )
                 self.widget.set(param, newValue)
 
         # Ensure value is exactly correct at end
@@ -95,19 +97,26 @@ class Recolour(AnimationBase):
         super().__init__(widget, timeout, colour=colour)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     from pygame_widgets.button import Button
-
 
     def animate():
         resize.start()
         translate.start()
 
-
     pygame.init()
     win = pygame.display.set_mode((600, 600))
 
-    button = Button(win, 100, 100, 300, 150, text="Hello", inactiveColour=(0, 200, 0), hoverColour=(0, 200, 0))
+    button = Button(
+        win,
+        100,
+        100,
+        300,
+        150,
+        text="Hello",
+        inactiveColour=(0, 200, 0),
+        hoverColour=(0, 200, 0),
+    )
 
     resize = Resize(button, 3, 200, 200)
     translate = Recolour(button, 5, (0, 100, 100))
