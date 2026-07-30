@@ -1,12 +1,12 @@
 import pygame
 
 import pygame_widgets
-from pygame_widgets.widget import WidgetBase
 from pygame_widgets.mouse import Mouse, MouseState
+from pygame_widgets.widget import WidgetBase
 
 
 class Button(WidgetBase):
-    def __init__(self, win, x, y, width, height, isSubWidget=False, **kwargs):
+    def __init__(self, win, x, y, width, height, is_sub_widget=False, **kwargs):
         """A customisable button for Pygame
 
         :param win: Surface on which to draw
@@ -21,91 +21,96 @@ class Button(WidgetBase):
         :type height: int
         :param kwargs: Optional parameters
         """
-        super().__init__(win, x, y, width, height, isSubWidget)
+        super().__init__(win, x, y, width, height, is_sub_widget)
 
-        # Colour
-        self.inactiveColour = kwargs.get("inactiveColour", (150, 150, 150))
-        self.hoverColour = kwargs.get("hoverColour", (125, 125, 125))
-        self.pressedColour = kwargs.get("pressedColour", (100, 100, 100))
-        self.colour = kwargs.get(
-            "colour", self.inactiveColour
-        )  # Allows colour to override inactiveColour
-        self.inactiveColour = self.colour
-        self.shadowDistance = kwargs.get("shadowDistance", 0)
-        self.shadowColour = kwargs.get("shadowColour", (210, 210, 180))
+        # Color
+        self.inactive_color = kwargs.get("inactive_color", (150, 150, 150))
+        self.hover_color = kwargs.get("hover_color", (125, 125, 125))
+        self.pressed_color = kwargs.get("pressed_color", (100, 100, 100))
+        self.color = kwargs.get(
+            "color", self.inactive_color
+        )  # Allows color to override inactive_color
+        self.inactive_color = self.color
+        self.shadow_distance = kwargs.get("shadow_distance", 0)
+        self.shadow_color = kwargs.get("shadow_color", (210, 210, 180))
 
         # Function
-        self.onClick = kwargs.get("onClick", lambda *args: None)
-        self.onRelease = kwargs.get("onRelease", lambda *args: None)
-        self.onHover = kwargs.get("onHover", lambda *args: None)
-        self.onHoverRelease = kwargs.get("onHoverRelease", lambda *args: None)
-        self.onClickParams = kwargs.get("onClickParams", ())
-        self.onReleaseParams = kwargs.get("onReleaseParams", ())
-        self.onHoverParams = kwargs.get("onHoverParams", ())
-        self.onHoverReleaseParams = kwargs.get("onHoverReleaseParams", ())
+        self.on_click = kwargs.get("on_click", lambda *args: None)
+        self.on_release = kwargs.get("on_release", lambda *args: None)
+        self.on_hover = kwargs.get("on_hover", lambda *args: None)
+        self.on_hover_release = kwargs.get("on_hover_release", lambda *args: None)
+        self.on_click_params = kwargs.get("on_click_params", ())
+        self.on_release_params = kwargs.get("on_release_params", ())
+        self.on_hover_params = kwargs.get("on_hover_params", ())
+        self.on_hover_release_params = kwargs.get("on_hover_release_params", ())
         self.clicked = False
 
         # Text (Remove if using PyInstaller)
-        self.textColour = kwargs.get("textColour", (0, 0, 0))
-        self.fontSize = kwargs.get("fontSize", 20)
+        self.text_color = kwargs.get("text_color", (0, 0, 0))
+        self.font_size = kwargs.get("font_size", 20)
         self.string = kwargs.get("text", "")
-        self.font = kwargs.get("font", pygame.font.SysFont("calibri", self.fontSize))
-        self.text = self.font.render(self.string, True, self.textColour)
-        self.textHAlign = kwargs.get("textHAlign", "centre")
-        self.textVAlign = kwargs.get("textVAlign", "centre")
+        self.font = kwargs.get("font", pygame.font.SysFont("calibri", self.font_size))
+        self.text = self.font.render(self.string, True, self.text_color)
+        self.text_horizontal_align = kwargs.get("text_horizontal_align", "centre")
+        self.text_vertical_align = kwargs.get("text_vertical_align", "centre")
         self.margin = kwargs.get("margin", 20)
 
-        self.textRect = self.text.get_rect()
-        self.alignTextRect()
+        self.text_rect = self.text.get_rect()
+        self.align_text_rect()
 
         # Image
         self.image = kwargs.get("image", None)
-        self.imageHAlign = kwargs.get("imageHAlign", "centre")
-        self.imageVAlign = kwargs.get("imageVAlign", "centre")
+        self.image_horizontal_align = kwargs.get("image_horizontal_align", "centre")
+        self.image_vertical_align = kwargs.get("image_vertical_align", "centre")
 
         if self.image:
-            self.imageRect = self.image.get_rect()
-            self.alignImageRect()
+            self.image_rect = self.image.get_rect()
+            self.align_image_rect()
 
         # Border
-        self.borderThickness = kwargs.get("borderThickness", 0)
-        self.inactiveBorderColour = kwargs.get("inactiveBorderColour", (0, 0, 0))
-        self.hoverBorderColour = kwargs.get("hoverBorderColour", (80, 80, 80))
-        self.pressedBorderColour = kwargs.get("pressedBorderColour", (100, 100, 100))
-        self.borderColour = kwargs.get("borderColour", self.inactiveBorderColour)
-        self.inactiveBorderColour = self.borderColour
+        self.border_thickness = kwargs.get("border_thickness", 0)
+        self.inactive_border_color = kwargs.get("inactive_border_color", (0, 0, 0))
+        self.hover_border_color = kwargs.get("hover_border_color", (80, 80, 80))
+        self.pressed_border_color = kwargs.get(
+            "pressed_border_color", (100, 100, 100)
+        )
+        self.border_color = kwargs.get("border_color", self.inactive_border_color)
+        self.inactive_border_color = self.border_color
         self.radius = kwargs.get("radius", 0)
 
-        self.mouseWasInside = False
+        self.mouse_was_inside = False
 
-    def alignImageRect(self):
-        self.imageRect.center = (
+    def align_image_rect(self):
+        self.image_rect.center = (
             self._x + self._width // 2,
             self._y + self._height // 2,
         )
 
-        if self.imageHAlign == "left":
-            self.imageRect.left = self._x + self.margin
-        elif self.imageHAlign == "right":
-            self.imageRect.right = self._x + self._width - self.margin
+        if self.image_horizontal_align == "left":
+            self.image_rect.left = self._x + self.margin
+        elif self.image_horizontal_align == "right":
+            self.image_rect.right = self._x + self._width - self.margin
 
-        if self.imageVAlign == "top":
-            self.imageRect.top = self._y + self.margin
-        elif self.imageVAlign == "bottom":
-            self.imageRect.bottom = self._y + self._height - self.margin
+        if self.image_vertical_align == "top":
+            self.image_rect.top = self._y + self.margin
+        elif self.image_vertical_align == "bottom":
+            self.image_rect.bottom = self._y + self._height - self.margin
 
-    def alignTextRect(self):
-        self.textRect.center = (self._x + self._width // 2, self._y + self._height // 2)
+    def align_text_rect(self):
+        self.text_rect.center = (
+            self._x + self._width // 2,
+            self._y + self._height // 2,
+        )
 
-        if self.textHAlign == "left":
-            self.textRect.left = self._x + self.margin
-        elif self.textHAlign == "right":
-            self.textRect.right = self._x + self._width - self.margin
+        if self.text_horizontal_align == "left":
+            self.text_rect.left = self._x + self.margin
+        elif self.text_horizontal_align == "right":
+            self.text_rect.right = self._x + self._width - self.margin
 
-        if self.textVAlign == "top":
-            self.textRect.top = self._y + self.margin
-        elif self.textVAlign == "bottom":
-            self.textRect.bottom = self._y + self._height - self.margin
+        if self.text_vertical_align == "top":
+            self.text_rect.top = self._y + self.margin
+        elif self.text_vertical_align == "bottom":
+            self.text_rect.bottom = self._y + self._height - self.margin
 
     def listen(self, events):
         """Wait for inputs
@@ -114,201 +119,129 @@ class Button(WidgetBase):
         :type events: list of pygame.event.Event
         """
         if not self._hidden and not self._disabled:
-            mouseState = Mouse.getMouseState()
+            mouse_state = Mouse.getMouseState()
             x, y = Mouse.getMousePos()
 
             if self.contains(x, y):
-                if mouseState == MouseState.RELEASE and self.clicked:
+                if mouse_state == MouseState.RELEASE and self.clicked:
                     self.clicked = False
-                    self.onRelease(*self.onReleaseParams)
+                    self.on_release(*self.on_release_params)
 
-                elif mouseState == MouseState.CLICK:
+                elif mouse_state == MouseState.CLICK:
                     self.clicked = True
-                    self.onClick(*self.onClickParams)
-                    self.colour = self.pressedColour
-                    self.borderColour = self.pressedBorderColour
+                    self.on_click(*self.on_click_params)
+                    self.color = self.pressed_color
+                    self.border_color = self.pressed_border_color
 
-                elif mouseState == MouseState.DRAG and self.clicked:
-                    self.colour = self.pressedColour
-                    self.borderColour = self.pressedBorderColour
+                elif mouse_state == MouseState.DRAG and self.clicked:
+                    self.color = self.pressed_color
+                    self.border_color = self.pressed_border_color
 
-                elif mouseState == MouseState.HOVER or mouseState == MouseState.DRAG:
-                    self.colour = self.hoverColour
-                    self.borderColour = self.hoverBorderColour
-                    self.onHover(*self.onHoverParams)
+                elif mouse_state == MouseState.HOVER or mouse_state == MouseState.DRAG:
+                    self.color = self.hover_color
+                    self.border_color = self.hover_border_color
+                    self.on_hover(*self.on_hover_params)
 
-                self.mouseWasInside = True
+                self.mouse_was_inside = True
 
-            elif self.mouseWasInside:
-                self.onHoverRelease(*self.onHoverReleaseParams)
-                self.mouseWasInside = False
+            elif self.mouse_was_inside:
+                self.on_hover_release(*self.on_hover_release_params)
+                self.mouse_was_inside = False
 
             else:
                 self.clicked = False
-                self.colour = self.inactiveColour
-                self.borderColour = self.inactiveBorderColour
+                self.color = self.inactive_color
+                self.border_color = self.inactive_border_color
 
     def draw(self):
         """Display to surface"""
         if not self._hidden:
-            if pygame.version.vernum[0] < 2:
-                borderRects = [
-                    (
-                        self._x + self.radius,
-                        self._y,
-                        self._width - self.radius * 2,
-                        self._height,
-                    ),
-                    (
-                        self._x,
-                        self._y + self.radius,
-                        self._width,
-                        self._height - self.radius * 2,
-                    ),
-                ]
+            pygame.draw.rect(
+                self.win,
+                self.shadow_color,
+                (
+                    self._x + self.shadow_distance,
+                    self._y + self.shadow_distance,
+                    self._width,
+                    self._height,
+                ),
+                border_radius=self.radius,
+            )
 
-                borderCircles = [
-                    (self._x + self.radius, self._y + self.radius),
-                    (self._x + self.radius, self._y + self._height - self.radius),
-                    (self._x + self._width - self.radius, self._y + self.radius),
-                    (
-                        self._x + self._width - self.radius,
-                        self._y + self._height - self.radius,
-                    ),
-                ]
+            pygame.draw.rect(
+                self.win,
+                self.border_color,
+                (self._x, self._y, self._width, self._height),
+                border_radius=self.radius,
+            )
 
-                backgroundRects = [
-                    (
-                        self._x + self.borderThickness + self.radius,
-                        self._y + self.borderThickness,
-                        self._width - 2 * (self.borderThickness + self.radius),
-                        self._height - 2 * self.borderThickness,
-                    ),
-                    (
-                        self._x + self.borderThickness,
-                        self._y + self.borderThickness + self.radius,
-                        self._width - 2 * self.borderThickness,
-                        self._height - 2 * (self.borderThickness + self.radius),
-                    ),
-                ]
-
-                backgroundCircles = [
-                    (
-                        self._x + self.radius + self.borderThickness,
-                        self._y + self.radius + self.borderThickness,
-                    ),
-                    (
-                        self._x + self.radius + self.borderThickness,
-                        self._y + self._height - self.radius - self.borderThickness,
-                    ),
-                    (
-                        self._x + self._width - self.radius - self.borderThickness,
-                        self._y + self.radius + self.borderThickness,
-                    ),
-                    (
-                        self._x + self._width - self.radius - self.borderThickness,
-                        self._y + self._height - self.radius - self.borderThickness,
-                    ),
-                ]
-
-                for rect in borderRects:
-                    pygame.draw.rect(self.win, self.borderColour, rect)
-
-                for circle in borderCircles:
-                    pygame.draw.circle(self.win, self.borderColour, circle, self.radius)
-
-                for rect in backgroundRects:
-                    pygame.draw.rect(self.win, self.colour, rect)
-
-                for circle in backgroundCircles:
-                    pygame.draw.circle(self.win, self.colour, circle, self.radius)
-            else:
-                pygame.draw.rect(
-                    self.win,
-                    self.shadowColour,
-                    (
-                        self._x + self.shadowDistance,
-                        self._y + self.shadowDistance,
-                        self._width,
-                        self._height,
-                    ),
-                    border_radius=self.radius,
-                )
-
-                pygame.draw.rect(
-                    self.win,
-                    self.borderColour,
-                    (self._x, self._y, self._width, self._height),
-                    border_radius=self.radius,
-                )
-
-                pygame.draw.rect(
-                    self.win,
-                    self.colour,
-                    (
-                        self._x + self.borderThickness,
-                        self._y + self.borderThickness,
-                        self._width - self.borderThickness * 2,
-                        self._height - self.borderThickness * 2,
-                    ),
-                    border_radius=self.radius,
-                )
+            pygame.draw.rect(
+                self.win,
+                self.color,
+                (
+                    self._x + self.border_thickness,
+                    self._y + self.border_thickness,
+                    self._width - self.border_thickness * 2,
+                    self._height - self.border_thickness * 2,
+                ),
+                border_radius=self.radius,
+            )
 
             if self.image:
-                self.imageRect = self.image.get_rect()
-                self.alignImageRect()
-                self.win.blit(self.image, self.imageRect)
+                self.image_rect = self.image.get_rect()
+                self.align_image_rect()
+                self.win.blit(self.image, self.image_rect)
 
-            self.text = self.font.render(self.string, True, self.textColour)
-            self.textRect = self.text.get_rect()
-            self.alignTextRect()
-            self.win.blit(self.text, self.textRect)
+            self.text = self.font.render(self.string, True, self.text_color)
+            self.text_rect = self.text.get_rect()
+            self.align_text_rect()
+            self.win.blit(self.text, self.text_rect)
 
-    def setText(self, text):
+    def set_text(self, text):
         self.string = text
-        self.text = self.font.render(self.string, True, self.textColour)
-        self.textRect = self.text.get_rect()
-        self.alignTextRect()
+        self.text = self.font.render(self.string, True, self.text_color)
+        self.text_rect = self.text.get_rect()
+        self.align_text_rect()
 
-    def setImage(self, image):
+    def set_image(self, image):
         self.image = image
-        self.imageRect = self.image.get_rect()
-        self.alignImageRect()
+        self.image_rect = self.image.get_rect()
+        self.align_image_rect()
 
-    def setOnClick(self, onClick, params=()):
-        self.onClick = onClick
-        self.onClickParams = params
+    def set_on_click(self, on_click, params=()):
+        self.on_click = on_click
+        self.on_click_params = params
 
-    def setOnRelease(self, onRelease, params=()):
-        self.onRelease = onRelease
-        self.onReleaseParams = params
+    def set_on_release(self, on_release, params=()):
+        self.on_release = on_release
+        self.on_release_params = params
 
-    def setOnHover(self, onHover, params=()):
-        self.onHover = onHover
-        self.onHoverParams = params
+    def set_on_hover(self, on_hover, params=()):
+        self.on_hover = on_hover
+        self.on_hover_params = params
 
-    def setInactiveColour(self, colour):
-        self.inactiveColour = colour
+    def set_inactive_color(self, color):
+        self.inactive_color = color
 
-    def setPressedColour(self, colour):
-        self.pressedColour = colour
+    def set_pressed_color(self, color):
+        self.pressed_color = color
 
-    def setHoverColour(self, colour):
-        self.hoverColour = colour
+    def set_hover_color(self, color):
+        self.hover_color = color
 
     def get(self, attr):
         parent = super().get(attr)
         if parent is not None:
             return parent
 
-        if attr == "colour":
-            return self.colour
+        if attr == "color":
+            return self.color
 
     def set(self, attr, value):
         super().set(attr, value)
 
-        if attr == "colour":
-            self.inactiveColour = value
+        if attr == "color":
+            self.inactive_color = value
 
 
 class ButtonArray(WidgetBase):
@@ -332,73 +265,73 @@ class ButtonArray(WidgetBase):
         super().__init__(win, x, y, width, height)
 
         self.shape = shape
-        self.numButtons = shape[0] * shape[1]
+        self.num_buttons = shape[0] * shape[1]
 
         # Array
-        self.colour = kwargs.get("colour", (210, 210, 180))
+        self.color = kwargs.get("color", (210, 210, 180))
         self.border = kwargs.get("border", 10)
-        self.topBorder = kwargs.get("topBorder", self.border)
-        self.bottomBorder = kwargs.get("bottomBorder", self.border)
-        self.leftBorder = kwargs.get("leftBorder", self.border)
-        self.rightBorder = kwargs.get("rightBorder", self.border)
-        self.borderRadius = kwargs.get("borderRadius", 0)
-        self.separationThickness = kwargs.get("separationThickness", self.border)
+        self.top_border = kwargs.get("top_border", self.border)
+        self.bottom_border = kwargs.get("bottom_border", self.border)
+        self.left_border = kwargs.get("left_border", self.border)
+        self.right_border = kwargs.get("right_border", self.border)
+        self.border_radius = kwargs.get("border_radius", 0)
+        self.separation_thickness = kwargs.get("separation_thickness", self.border)
 
-        self.buttonAttributes = {
-            # Colour
-            "inactiveColour": kwargs.get("inactiveColours", None),
-            "hoverColour": kwargs.get("hoverColours", None),
-            "pressedColour": kwargs.get("pressedColours", None),
-            "shadowDistance": kwargs.get("shadowDistances", None),
-            "shadowColour": kwargs.get("shadowColours", None),
+        self.button_attributes = {
+            # Color
+            "inactive_color": kwargs.get("inactive_colors", None),
+            "hover_color": kwargs.get("hover_colors", None),
+            "pressed_color": kwargs.get("pressed_colors", None),
+            "shadow_distance": kwargs.get("shadow_distances", None),
+            "shadow_color": kwargs.get("shadow_colors", None),
             # Function
-            "onClick": kwargs.get("onClicks", None),
-            "onRelease": kwargs.get("onReleases", None),
-            "onHover": kwargs.get("onHovers", None),
-            "onClickParams": kwargs.get("onClickParams", None),
-            "onReleaseParams": kwargs.get("onReleaseParams", None),
-            "onHoverParams": kwargs.get("onHoverParams", None),
+            "on_click": kwargs.get("on_clicks", None),
+            "on_release": kwargs.get("on_releases", None),
+            "on_hover": kwargs.get("on_hovers", None),
+            "on_click_params": kwargs.get("on_click_params", None),
+            "on_release_params": kwargs.get("on_release_params", None),
+            "on_hover_params": kwargs.get("on_hover_params", None),
             # Text
-            "textColour": kwargs.get("textColours", None),
-            "fontSize": kwargs.get("fontSizes", None),
+            "text_color": kwargs.get("text_colors", None),
+            "font_size": kwargs.get("font_sizes", None),
             "text": kwargs.get("texts", None),
             "font": kwargs.get("fonts", None),
-            "textHAlign": kwargs.get("textHAligns", None),
-            "textVAlign": kwargs.get("textVAligns", None),
+            "text_horizontal_align": kwargs.get("text_horizontal_aligns", None),
+            "text_vertical_align": kwargs.get("text_vertical_aligns", None),
             "margin": kwargs.get("margins", None),
             # Image
             "image": kwargs.get("images", None),
-            "imageHAlign": kwargs.get("imageHAligns", None),
-            "imageVAlign": kwargs.get("imageVAligns", None),
-            "imageRotation": kwargs.get("imageRotations", None),
-            "imageFill": kwargs.get("imageFills", None),
-            "imageZoom": kwargs.get("imageZooms", None),
+            "image_horizontal_align": kwargs.get("image_horizontal_aligns", None),
+            "image_vertical_align": kwargs.get("image_verical_aligns", None),
+            "image_rotation": kwargs.get("image_rotations", None),
+            "image_fill": kwargs.get("image_fills", None),
+            "image_zoom": kwargs.get("image_zooms", None),
             "radius": kwargs.get("radii", None),
         }
 
         self.buttons = []
-        self.createButtons()
+        self.create_buttons()
 
-    def createButtons(self):
+    def create_buttons(self):
         across, down = self.shape
         width = (
             self._width
-            - self.separationThickness * (across - 1)
-            - self.leftBorder
-            - self.rightBorder
+            - self.separation_thickness * (across - 1)
+            - self.left_border
+            - self.right_border
         ) // across
         height = (
             self._height
-            - self.separationThickness * (down - 1)
-            - self.topBorder
-            - self.bottomBorder
+            - self.separation_thickness * (down - 1)
+            - self.top_border
+            - self.bottom_border
         ) // down
 
         count = 0
         for i in range(across):
             for j in range(down):
-                x = self._x + i * (width + self.separationThickness) + self.leftBorder
-                y = self._y + j * (height + self.separationThickness) + self.topBorder
+                x = self._x + i * (width + self.separation_thickness) + self.left_border
+                y = self._y + j * (height + self.separation_thickness) + self.top_border
                 self.buttons.append(
                     Button(
                         self.win,
@@ -406,10 +339,10 @@ class ButtonArray(WidgetBase):
                         y,
                         width,
                         height,
-                        isSubWidget=True,
+                        is_sub_widget=True,
                         **{
                             k: v[count]
-                            for k, v in self.buttonAttributes.items()
+                            for k, v in self.button_attributes.items()
                             if v is not None
                         },
                     )
@@ -431,49 +364,51 @@ class ButtonArray(WidgetBase):
         if not self._hidden:
             rects = [
                 (
-                    self._x + self.borderRadius,
+                    self._x + self.border_radius,
                     self._y,
-                    self._width - self.borderRadius * 2,
+                    self._width - self.border_radius * 2,
                     self._height,
                 ),
                 (
                     self._x,
-                    self._y + self.borderRadius,
+                    self._y + self.border_radius,
                     self._width,
-                    self._height - self.borderRadius * 2,
+                    self._height - self.border_radius * 2,
                 ),
             ]
 
             circles = [
-                (self._x + self.borderRadius, self._y + self.borderRadius),
+                (self._x + self.border_radius, self._y + self.border_radius),
                 (
-                    self._x + self.borderRadius,
-                    self._y + self._height - self.borderRadius,
+                    self._x + self.border_radius,
+                    self._y + self._height - self.border_radius,
                 ),
                 (
-                    self._x + self._width - self.borderRadius,
-                    self._y + self.borderRadius,
+                    self._x + self._width - self.border_radius,
+                    self._y + self.border_radius,
                 ),
                 (
-                    self._x + self._width - self.borderRadius,
-                    self._y + self._height - self.borderRadius,
+                    self._x + self._width - self.border_radius,
+                    self._y + self._height - self.border_radius,
                 ),
             ]
 
             for rect in rects:
-                pygame.draw.rect(self.win, self.colour, rect)
+                pygame.draw.rect(self.win, self.color, rect)
 
             for circle in circles:
-                pygame.draw.circle(self.win, self.colour, circle, self.borderRadius)
+                pygame.draw.circle(self.win, self.color, circle, self.border_radius)
 
             for button in self.buttons:
                 button.draw()
 
-    def getButtons(self):
+    def get_buttons(self):
         return self.buttons
 
 
 if __name__ == "__main__":
+    import sys
+
     pygame.init()
     win = pygame.display.set_mode((600, 600))
 
@@ -484,22 +419,22 @@ if __name__ == "__main__":
         300,
         150,
         text="Hello",
-        fontSize=50,
+        font_size=50,
         margin=20,
-        inactiveColour=(255, 0, 0),
-        pressedColour=(0, 255, 0),
+        inactive_color=(255, 0, 0),
+        pressed_color=(0, 255, 0),
         radius=20,
-        onClick=lambda: print("Click"),
+        on_click=lambda: print("Click"),
         font=pygame.font.SysFont("calibri", 10),
-        textVAlign="bottom",
-        imageHAlign="centre",
-        imageVAlign="centre",
-        borderThickness=3,
-        onRelease=lambda: print("Release"),
-        shadowDistance=5,
-        borderColour=(0, 0, 0),
-        onHover=lambda: print("Hover"),
-        onHoverRelease=lambda: print("Hover Release"),
+        text_vertical_align="bottom",
+        image_horizontal_align="centre",
+        image_vertical_align="centre",
+        border_thickness=3,
+        on_release=lambda: print("Release"),
+        shadow_distance=5,
+        border_color=(0, 0, 0),
+        on_hover=lambda: print("Hover"),
+        on_hover_release=lambda: print("Hover Release"),
     )
 
     buttonArray = ButtonArray(
@@ -528,7 +463,7 @@ if __name__ == "__main__":
             if event.type == pygame.QUIT:
                 pygame.quit()
                 run = False
-                quit()
+                sys.exit()
 
         win.fill((255, 255, 255))
 
