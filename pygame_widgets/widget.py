@@ -1,9 +1,7 @@
 import weakref
-
-from collections.abc import Iterable, MutableSet, Iterator
+from abc import ABC, abstractmethod
 from collections import OrderedDict
-
-from abc import abstractmethod, ABC
+from collections.abc import Iterable, Iterator, MutableSet
 from typing import Any
 
 import pygame
@@ -63,7 +61,7 @@ class OrderedWeakset(weakref.WeakSet):
 
     def __init__(self, values: Iterable = ()):
         """Initialise the weak set with optional *values*."""
-        super(OrderedWeakset, self).__init__()
+        super().__init__()
 
         self.data = OrderedSet()
         for elem in values:
@@ -90,10 +88,10 @@ class WidgetBase(ABC):
     def __init__(
         self,
         win: pygame.Surface,
-        x: int | float,
-        y: int | float,
-        width: int | float,
-        height: int | float,
+        x: float,
+        y: float,
+        width: float,
+        height: float,
         is_sub_widget: bool = False,
     ) -> None:
         """Initialize common widget state.
@@ -112,28 +110,26 @@ class WidgetBase(ABC):
         self._y = y
         self._width = width
         self._height = height
-        self._isSubWidget = is_sub_widget
+        self._is_sub_widget = is_sub_widget
 
         self._hidden = False
         self._disabled = False
 
         if not is_sub_widget:
-            WidgetHandler.addWidget(self)
+            WidgetHandler.add_widget(self)
 
     @abstractmethod
     def listen(self, events: list[pygame.Event]) -> None:
         """Handle input events for this frame."""
-        pass
 
     @abstractmethod
     def draw(self) -> None:
         """Draw the widget's current state to ``self.win``."""
-        pass
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}(x = {self._x}, y = {self._y}, width = {self._width}, height = {self._height})"
 
-    def contains(self, x: int | float, y: int | float) -> bool:
+    def contains(self, x: float, y: float) -> bool:
         """Return whether a point lies inside the widget bounds.
 
         Args:
@@ -150,14 +146,14 @@ class WidgetBase(ABC):
     def hide(self) -> None:
         """Hide the widget and move it behind other top-level widgets."""
         self._hidden = True
-        if not self._isSubWidget:
-            WidgetHandler.moveToBottom(self)
+        if not self._is_sub_widget:
+            WidgetHandler.move_to_bottom(self)
 
     def show(self) -> None:
         """Show the widget and move it above other top-level widgets."""
         self._hidden = False
-        if not self._isSubWidget:
-            WidgetHandler.moveToTop(self)
+        if not self._is_sub_widget:
+            WidgetHandler.move_to_top(self)
 
     def disable(self) -> None:
         """Prevent the widget from handling input."""
@@ -169,21 +165,21 @@ class WidgetBase(ABC):
 
     def is_sub_widget(self) -> bool:
         """Return whether this widget is managed by a parent widget."""
-        return self._isSubWidget
+        return self._is_sub_widget
 
-    def moveToTop(self) -> None:
+    def move_to_top(self) -> None:
         """Move this widget to the top of the global draw/event order."""
-        WidgetHandler.moveToTop(self)
+        WidgetHandler.move_to_top(self)
 
-    def moveToBottom(self) -> None:
+    def move_to_bottom(self) -> None:
         """Move this widget to the bottom of the global draw/event order."""
-        WidgetHandler.moveToBottom(self)
+        WidgetHandler.move_to_bottom(self)
 
-    def moveX(self, x: int | float) -> None:
+    def move_x(self, x: float) -> None:
         """Move the widget horizontally by ``x`` pixels."""
         self._x += x
 
-    def moveY(self, y: int | float) -> None:
+    def move_y(self, y: float) -> None:
         """Move the widget vertically by ``y`` pixels."""
         self._y += y
 
@@ -209,27 +205,27 @@ class WidgetBase(ABC):
         elif attr == "height":
             return self._height
 
-    def getX(self) -> int | float:
+    def get_x(self) -> int | float:
         """Return the widget's x-coordinate."""
         return self._x
 
-    def getY(self) -> int | float:
+    def get_y(self) -> int | float:
         """Return the widget's y-coordinate."""
         return self._y
 
-    def getWidth(self) -> int | float:
+    def get_width(self) -> int | float:
         """Return the widget width."""
         return self._width
 
-    def getHeight(self) -> int | float:
+    def get_height(self) -> int | float:
         """Return the widget height."""
         return self._height
 
-    def isVisible(self) -> bool:
+    def is_visible(self) -> bool:
         """Return whether the widget is visible."""
         return not self._hidden
 
-    def isEnabled(self) -> bool:
+    def is_enabled(self) -> bool:
         """Return whether the widget can handle input."""
         return not self._disabled
 
@@ -254,29 +250,29 @@ class WidgetBase(ABC):
         elif attr == "height":
             self._height = value
 
-    def setX(self, x: int | float) -> None:
+    def set_x(self, x: float) -> None:
         """Set the widget's x-coordinate."""
         self._x = x
 
-    def setY(self, y: int | float) -> None:
+    def set_y(self, y: float) -> None:
         """Set the widget's y-coordinate."""
         self._y = y
 
-    def setWidth(self, width: int | float) -> None:
+    def set_width(self, width: float) -> None:
         """Set the widget width."""
         self._width = width
 
-    def setHeight(self, height: int | float) -> None:
+    def set_height(self, height: float) -> None:
         """Set the widget height."""
         self._height = height
 
-    def setIsSubWidget(self, is_sub_widget: bool) -> None:
+    def set_is_sub_widget(self, is_sub_widget: bool) -> None:
         """Update sub-widget ownership and global handler registration."""
-        self._isSubWidget = is_sub_widget
+        self._is_sub_widget = is_sub_widget
         if is_sub_widget:
-            WidgetHandler.removeWidget(self)
+            WidgetHandler.remove_widget(self)
         else:
-            WidgetHandler.addWidget(self)
+            WidgetHandler.add_widget(self)
 
 
 class WidgetHandler:
@@ -318,14 +314,14 @@ class WidgetHandler:
             widget.draw()
 
     @staticmethod
-    def addWidget(widget: WidgetBase) -> None:
+    def add_widget(widget: WidgetBase) -> None:
         """Register a widget and place it at the top of the stack."""
         if widget not in WidgetHandler._widgets:
             WidgetHandler._widgets.add(widget)
-            WidgetHandler.moveToTop(widget)
+            WidgetHandler.move_to_top(widget)
 
     @staticmethod
-    def removeWidget(widget: WidgetBase) -> None:
+    def remove_widget(widget: WidgetBase) -> None:
         """Remove a widget from the registry."""
         try:
             WidgetHandler._widgets.remove(widget)
@@ -335,7 +331,7 @@ class WidgetHandler:
             )
 
     @staticmethod
-    def moveToTop(widget: WidgetBase) -> None:
+    def move_to_top(widget: WidgetBase) -> None:
         """Move a registered widget above all other widgets."""
         try:
             WidgetHandler._widgets.move_to_end(widget)
@@ -345,7 +341,7 @@ class WidgetHandler:
             )
 
     @staticmethod
-    def moveToBottom(widget: WidgetBase) -> None:
+    def move_to_bottom(widget: WidgetBase) -> None:
         """Move a registered widget below all other widgets."""
         try:
             WidgetHandler._widgets.move_to_start(widget)
@@ -355,6 +351,6 @@ class WidgetHandler:
             )
 
     @staticmethod
-    def getWidgets() -> OrderedWeakset:
+    def get_widgets() -> OrderedWeakset:
         """Return the live widget registry."""
         return WidgetHandler._widgets
