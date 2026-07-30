@@ -1,4 +1,5 @@
-from typing import Callable
+from collections.abc import Callable
+
 import pygame
 
 import pygame_widgets
@@ -14,8 +15,8 @@ class ProgressBar(WidgetBase):
 
         self.curved = kwargs.get("curved", False)
 
-        self.completedColour = kwargs.get("completedColour", (0, 200, 0))
-        self.incompletedColour = kwargs.get("incompletedColour", (100, 100, 100))
+        self.completed_color = kwargs.get("completed_color", (0, 200, 0))
+        self.incompleted_color = kwargs.get("incompleted_color", (100, 100, 100))
 
         self.percent = self.progress()
 
@@ -35,51 +36,51 @@ class ProgressBar(WidgetBase):
                 if self.percent == 0:
                     pygame.draw.circle(
                         self.win,
-                        self.incompletedColour,
+                        self.incompleted_color,
                         (self._x, self._y + self._height // 2),
                         self.radius,
                     )
                     pygame.draw.circle(
                         self.win,
-                        self.incompletedColour,
+                        self.incompleted_color,
                         (self._x + self._width, self._y + self._height // 2),
                         self.radius,
                     )
                 elif self.percent == 1:
                     pygame.draw.circle(
                         self.win,
-                        self.completedColour,
+                        self.completed_color,
                         (self._x, self._y + self._height // 2),
                         self.radius,
                     )
                     pygame.draw.circle(
                         self.win,
-                        self.completedColour,
+                        self.completed_color,
                         (self._x + self._width, self._y + self._height // 2),
                         self.radius,
                     )
                 else:
                     pygame.draw.circle(
                         self.win,
-                        self.completedColour,
+                        self.completed_color,
                         (self._x, self._y + self._height // 2),
                         self.radius,
                     )
                     pygame.draw.circle(
                         self.win,
-                        self.incompletedColour,
+                        self.incompleted_color,
                         (self._x + self._width, self._y + self._height // 2),
                         self.radius,
                     )
 
             pygame.draw.rect(
                 self.win,
-                self.completedColour,
+                self.completed_color,
                 (self._x, self._y, int(self._width * self.percent), self._height),
             )
             pygame.draw.rect(
                 self.win,
-                self.incompletedColour,
+                self.incompleted_color,
                 (
                     self._x + int(self._width * self.percent),
                     self._y,
@@ -90,15 +91,16 @@ class ProgressBar(WidgetBase):
 
 
 if __name__ == "__main__":
+    import sys
     import time
 
-    startTime = time.time()
+    start_time = time.time()
 
     pygame.init()
     win = pygame.display.set_mode((1000, 600))
 
-    progressBar = ProgressBar(
-        win, 100, 100, 500, 40, lambda: 1 - (time.time() - startTime) / 10, curved=True
+    progress_bar = ProgressBar(
+        win, 100, 100, 500, 40, lambda: 1 - (time.time() - start_time) / 10, curved=True
     )
 
     run = True
@@ -108,7 +110,7 @@ if __name__ == "__main__":
             if event.type == pygame.QUIT:
                 pygame.quit()
                 run = False
-                quit()
+                sys.exit()
 
         win.fill((255, 255, 255))
 
