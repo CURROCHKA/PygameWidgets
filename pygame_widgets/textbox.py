@@ -229,8 +229,8 @@ class TextBox(WidgetBase):
                     self.first_repeat = True
 
     def handle_mouse(self) -> None:
-        mouse_state = Mouse.getMouseState()
-        x, y = Mouse.getMousePos()
+        mouse_state = Mouse.get_mouse_state()
+        x, y = Mouse.get_mouse_pos()
 
         if mouse_state == MouseState.CLICK:
             self.process_mouse_click(x, y)
@@ -594,7 +594,7 @@ class TextBox(WidgetBase):
 
     def process_mouse_scroll(self) -> None:
         self.first_visible_line_index -= (
-            Mouse.getWheelDelta() * self.style.lines_per_scroll
+            Mouse.get_wheel_delta() * self.style.lines_per_scroll
         )
         max_scroll = max(0, len(self.cached_visual_lines) - self.max_visible_lines)
         self.first_visible_line_index = max(

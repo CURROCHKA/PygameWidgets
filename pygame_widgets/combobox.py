@@ -219,18 +219,18 @@ if __name__ == "__main__":
         10,
         250,
         50,
-        name="Select Colour",
+        name="Select Color",
         choices=pygame.colordict.THECOLORS.keys(),
         max_results=4,
         font=pygame.font.SysFont("calibri", 30),
         border_radius=3,
-        colour=(0, 200, 50),
+        color=(0, 200, 50),
         direction="down",
         text_horizontal_align="left",
     )
 
     def output():
-        combo_box.text_bar.colour = combo_box.get_text()
+        combo_box.text_bar.color = combo_box.get_text()
 
     button = Button(
         win,
@@ -238,11 +238,11 @@ if __name__ == "__main__":
         10,
         100,
         50,
-        text="Set Colour",
+        text="Set Color",
         font_size=30,
         margin=15,
-        inactive_colour=(200, 0, 100),
-        pressed_colour=(0, 255, 0),
+        inactive_color=(200, 0, 100),
+        pressed_color=(0, 255, 0),
         radius=5,
         on_click=output,
         font=pygame.font.SysFont("calibri", 18),

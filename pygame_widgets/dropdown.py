@@ -205,20 +205,20 @@ class DropdownChoice(WidgetBase):
         self._value = kwargs.get("value", text)
         # Border
         self.border_thickness = kwargs.get("border_thickness", 3)
-        self.border_colour = kwargs.get("border_colour", (0, 0, 0))
+        self.border_color = kwargs.get("border_color", (0, 0, 0))
         self.border_radius = kwargs.get("border_radius", 0)
 
-        # Colour
-        self.inactive_colour = kwargs.get("inactive_colour", (150, 150, 150))
-        self.hover_colour = kwargs.get("hover_colour", (125, 125, 125))
-        self.pressed_colour = kwargs.get("pressed_colour", (100, 100, 100))
-        self.colour = kwargs.get(
-            "colour", self.inactive_colour
-        )  # Allows colour to override inactive_colour
-        self.inactive_colour = self.colour
+        # Color
+        self.inactive_color = kwargs.get("inactive_color", (150, 150, 150))
+        self.hover_color = kwargs.get("hover_color", (125, 125, 125))
+        self.pressed_color = kwargs.get("pressed_color", (100, 100, 100))
+        self.color = kwargs.get(
+            "color", self.inactive_color
+        )  # Allows color to override inactive_color
+        self.inactive_color = self.color
 
         # Text
-        self.text_colour = kwargs.get("text_colour", (0, 0, 0))
+        self.text_color = kwargs.get("text_color", (0, 0, 0))
         self.font_size = kwargs.get("font_size", 20)
         self.font = kwargs.get(
             "font", pygame.font.SysFont("sans-serif", self.font_size)
@@ -243,10 +243,10 @@ class DropdownChoice(WidgetBase):
                 self._height,
             )
             pygame.draw.rect(
-                self.win, self.colour, rect, **self._compute_border_radii()
+                self.win, self.color, rect, **self._compute_border_radii()
             )
 
-            text_rendered = self.font.render(self.text, True, self.text_colour)
+            text_rendered = self.font.render(self.text, True, self.text_color)
 
             if self.text_horizontal_align == "centre":
                 text_rect = text_rendered.get_rect(
@@ -295,17 +295,17 @@ class DropdownChoice(WidgetBase):
 
                 elif mouse_state == MouseState.CLICK:
                     self.clicked = True
-                    self.colour = self.pressed_colour
+                    self.color = self.pressed_color
 
                 elif mouse_state == MouseState.DRAG and self.clicked:
-                    self.colour = self.pressed_colour
+                    self.color = self.pressed_color
 
                 elif mouse_state == MouseState.HOVER or mouse_state == MouseState.DRAG:
-                    self.colour = self.hover_colour
+                    self.color = self.hover_color
 
             else:
                 self.clicked = False
-                self.colour = self.inactive_colour
+                self.color = self.inactive_color
 
     def contains(self, x, y) -> bool:
         return (
@@ -398,20 +398,20 @@ class HeadDropdown(DropdownChoice):
                     self._dropdown.toggle_dropped()
 
                 elif mouse_state == MouseState.DRAG and self.clicked:
-                    self.colour = self.pressed_colour
+                    self.color = self.pressed_color
 
                 elif mouse_state == MouseState.RELEASE:
                     self.clicked = False
 
                 elif mouse_state == MouseState.HOVER or mouse_state == MouseState.DRAG:
-                    self.colour = self.hover_colour
+                    self.color = self.hover_color
 
                 elif mouse_state == MouseState.RIGHT_CLICK:
                     self._dropdown.reset()
 
             else:
                 self.clicked = False
-                self.colour = self.inactive_colour
+                self.color = self.inactive_color
 
     def _compute_border_radii(self):
         border_radius = {}
@@ -465,9 +465,9 @@ if __name__ == "__main__":
         10,
         100,
         50,
-        name="Select Colour",
+        name="Select Color",
         choices=["Red", "Blue", "Yellow"],
-        colour=(200, 0, 0),
+        color=(200, 0, 0),
         border_radius=3,
         values=[1, 2, "true"],
         direction="down",
@@ -486,8 +486,8 @@ if __name__ == "__main__":
         text="Print Value",
         font_size=30,
         margin=20,
-        inactive_colour=(255, 0, 0),
-        pressed_colour=(0, 255, 0),
+        inactive_color=(255, 0, 0),
+        pressed_color=(0, 255, 0),
         radius=5,
         on_click=printValue,
         font=pygame.font.SysFont("calibri", 10),

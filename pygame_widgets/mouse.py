@@ -1,6 +1,7 @@
-from enum import Enum
-import pygame
 import time
+from enum import Enum
+
+import pygame
 
 
 class MouseState(Enum):
@@ -22,199 +23,203 @@ class MouseState(Enum):
 
 
 class Mouse:
-    _refreshTime = 0.01
-    _multiClickThreshold = 0.4
-    _multiClickRadius = 5
+    _refresh_time = 0.01
+    _multi_click_threshold = 0.4
+    _multi_click_radius = 5
 
-    lastLeftClick = 0
-    lastRightClick = 0
-    leftClickElapsedTime = 0
-    rightClickElapsedTime = 0
-    _leftClickCount = 0
-    _rightClickCount = 0
-    _lastLeftClickPos = (0, 0)
-    _lastRightClickPos = (0, 0)
+    last_left_click = 0
+    last_right_click = 0
+    left_click_elapsed_time = 0
+    right_click_elapsed_time = 0
+    _left_click_count = 0
+    _right_click_count = 0
+    _last_left_click_pos = (0, 0)
+    _last_right_click_pos = (0, 0)
 
     # Wheel scroll accumulated by handleEvent, consumed once per frame
-    _wheelDelta = 0
-    _pendingWheelDelta = 0
+    _wheel_delta = 0
+    _pending_wheel_delta = 0
 
-    _mouseState = MouseState.HOVER
+    _mouse_state = MouseState.HOVER
 
     @staticmethod
     def listen():
         listening = True
         while listening:
             try:
-                Mouse.updateMouseState()
+                Mouse.update_mouse_state()
             except pygame.error:
                 listening = False
-            time.sleep(Mouse._refreshTime)
+            time.sleep(Mouse._refresh_time)
 
     @staticmethod
-    def updateMouseState():
-        mousePressed = pygame.mouse.get_pressed()
-        leftPressed = mousePressed[0]
-        wheelPressed = mousePressed[1]
-        rightPressed = mousePressed[2]
+    def update_mouse_state():
+        mouse_pressed = pygame.mouse.get_pressed()
+        left_pressed = mouse_pressed[0]
+        wheel_pressed = mouse_pressed[1]
+        right_pressed = mouse_pressed[2]
 
         # Consume scroll accumulated since last frame. Scroll is instantaneous:
         # it lives for exactly one frame and never "sticks".
-        scrolled = Mouse._pendingWheelDelta != 0
-        Mouse._wheelDelta = Mouse._pendingWheelDelta
-        Mouse._pendingWheelDelta = 0
+        scrolled = Mouse._pending_wheel_delta != 0
+        Mouse._wheel_delta = Mouse._pending_wheel_delta
+        Mouse._pending_wheel_delta = 0
 
         if scrolled:
-            Mouse._mouseState = MouseState.WHEEL_MOTION
+            Mouse._mouse_state = MouseState.WHEEL_MOTION
             return
 
-        if leftPressed:
-            Mouse._mouseState = (
+        if left_pressed:
+            Mouse._mouse_state = (
                 MouseState.DRAG
-                if Mouse._mouseState in (MouseState.CLICK, MouseState.DRAG)
+                if Mouse._mouse_state in (MouseState.CLICK, MouseState.DRAG)
                 else MouseState.CLICK
             )
 
-        elif wheelPressed:
-            Mouse._mouseState = (
+        elif wheel_pressed:
+            Mouse._mouse_state = (
                 MouseState.WHEEL_DRAG
-                if Mouse._mouseState in (MouseState.WHEEL_CLICK, MouseState.WHEEL_DRAG)
+                if Mouse._mouse_state in (MouseState.WHEEL_CLICK, MouseState.WHEEL_DRAG)
                 else MouseState.WHEEL_CLICK
             )
 
-        elif rightPressed:
-            Mouse._mouseState = (
+        elif right_pressed:
+            Mouse._mouse_state = (
                 MouseState.RIGHT_DRAG
-                if Mouse._mouseState in (MouseState.RIGHT_CLICK, MouseState.RIGHT_DRAG)
+                if Mouse._mouse_state in (MouseState.RIGHT_CLICK, MouseState.RIGHT_DRAG)
                 else MouseState.RIGHT_CLICK
             )
 
         else:
             # Button(s) released this frame -> resolve final state
-            if Mouse._mouseState in (MouseState.CLICK, MouseState.DRAG):
-                Mouse._registerLeftRelease()
-            elif Mouse._mouseState in (MouseState.WHEEL_CLICK, MouseState.WHEEL_DRAG):
-                Mouse._mouseState = MouseState.WHEEL_RELEASE
-            elif Mouse._mouseState in (MouseState.RIGHT_CLICK, MouseState.RIGHT_DRAG):
-                Mouse._registerRightRelease()
+            if Mouse._mouse_state in (MouseState.CLICK, MouseState.DRAG):
+                Mouse._register_left_release()
+            elif Mouse._mouse_state in (MouseState.WHEEL_CLICK, MouseState.WHEEL_DRAG):
+                Mouse._mouse_state = MouseState.WHEEL_RELEASE
+            elif Mouse._mouse_state in (MouseState.RIGHT_CLICK, MouseState.RIGHT_DRAG):
+                Mouse._register_right_release()
             else:
-                Mouse._expireClickCounters()
-                Mouse._mouseState = MouseState.HOVER
+                Mouse._expire_click_counters()
+                Mouse._mouse_state = MouseState.HOVER
 
     @staticmethod
-    def _isWithinRadius(pos1, pos2) -> bool:
+    def _is_within_radius(pos1, pos2) -> bool:
         dx = pos1[0] - pos2[0]
         dy = pos1[1] - pos2[1]
-        return dx * dx + dy * dy <= Mouse._multiClickRadius * Mouse._multiClickRadius
+        return (
+            dx * dx + dy * dy <= Mouse._multi_click_radius * Mouse._multi_click_radius
+        )
 
     @staticmethod
-    def _registerLeftRelease():
+    def _register_left_release():
         now = time.time()
         pos = pygame.mouse.get_pos()
 
-        inTime = now - Mouse.lastLeftClick <= Mouse._multiClickThreshold
-        inPlace = Mouse._isWithinRadius(pos, Mouse._lastLeftClickPos)
-        if inTime and inPlace:
-            Mouse._leftClickCount += 1
+        in_time = now - Mouse.last_left_click <= Mouse._multi_click_threshold
+        in_place = Mouse._is_within_radius(pos, Mouse._last_left_click_pos)
+        if in_time and in_place:
+            Mouse._left_click_count += 1
         else:
-            Mouse._leftClickCount = 1
-        Mouse.lastLeftClick = now
-        Mouse._lastLeftClickPos = pos
+            Mouse._left_click_count = 1
+        Mouse.last_left_click = now
+        Mouse._last_left_click_pos = pos
 
-        if Mouse._leftClickCount >= 3:
-            Mouse._mouseState = MouseState.TRIPLE_CLICK
-            Mouse._leftClickCount = 0
-        elif Mouse._leftClickCount == 2:
-            Mouse._mouseState = MouseState.DOUBLE_CLICK
+        if Mouse._left_click_count >= 3:
+            Mouse._mouse_state = MouseState.TRIPLE_CLICK
+            Mouse._left_click_count = 0
+        elif Mouse._left_click_count == 2:
+            Mouse._mouse_state = MouseState.DOUBLE_CLICK
         else:
-            Mouse._mouseState = MouseState.RELEASE
+            Mouse._mouse_state = MouseState.RELEASE
 
     @staticmethod
-    def _registerRightRelease():
+    def _register_right_release():
         now = time.time()
         pos = pygame.mouse.get_pos()
 
-        inTime = now - Mouse.lastRightClick <= Mouse._multiClickThreshold
-        inPlace = Mouse._isWithinRadius(pos, Mouse._lastRightClickPos)
-        if inTime and inPlace:
-            Mouse._rightClickCount += 1
+        in_time = now - Mouse.last_right_click <= Mouse._multi_click_threshold
+        in_place = Mouse._is_within_radius(pos, Mouse._last_right_click_pos)
+        if in_time and in_place:
+            Mouse._right_click_count += 1
         else:
-            Mouse._rightClickCount = 1
-        Mouse.lastRightClick = now
-        Mouse._lastRightClickPos = pos
+            Mouse._right_click_count = 1
+        Mouse.last_right_click = now
+        Mouse._last_right_click_pos = pos
 
-        if Mouse._rightClickCount >= 3:
-            Mouse._mouseState = MouseState.TRIPLE_RIGHT_CLICK
-            Mouse._rightClickCount = 0
-        elif Mouse._rightClickCount == 2:
-            Mouse._mouseState = MouseState.DOUBLE_RIGHT_CLICK
+        if Mouse._right_click_count >= 3:
+            Mouse._mouse_state = MouseState.TRIPLE_RIGHT_CLICK
+            Mouse._right_click_count = 0
+        elif Mouse._right_click_count == 2:
+            Mouse._mouse_state = MouseState.DOUBLE_RIGHT_CLICK
         else:
-            Mouse._mouseState = MouseState.RIGHT_RELEASE
+            Mouse._mouse_state = MouseState.RIGHT_RELEASE
 
     @staticmethod
-    def _expireClickCounters():
+    def _expire_click_counters():
         now = time.time()
         if (
-            Mouse._leftClickCount
-            and now - Mouse.lastLeftClick > Mouse._multiClickThreshold
+            Mouse._left_click_count
+            and now - Mouse.last_left_click > Mouse._multi_click_threshold
         ):
-            Mouse._leftClickCount = 0
+            Mouse._left_click_count = 0
         if (
-            Mouse._rightClickCount
-            and now - Mouse.lastRightClick > Mouse._multiClickThreshold
+            Mouse._right_click_count
+            and now - Mouse.last_right_click > Mouse._multi_click_threshold
         ):
-            Mouse._rightClickCount = 0
+            Mouse._right_click_count = 0
 
     @staticmethod
-    def handleEvents(events: list[pygame.Event]):
+    def handle_events(events: list[pygame.Event]):
         """Feed pygame events here so wheel scroll can be tracked.
 
         Only scroll needs the event queue; the middle-button click/drag/release
-        is handled by polling in updateMouseState, like the left/right buttons.
+        is handled by polling in update_mouse_state, like the left/right buttons.
         """
         for event in events:
             if event.type == pygame.MOUSEWHEEL:
-                Mouse._pendingWheelDelta = event.y
+                Mouse._pending_wheel_delta = event.y
 
     @staticmethod
-    def updateElapsedTime():
-        if Mouse._mouseState in (MouseState.CLICK, MouseState.DRAG):
-            Mouse.leftClickElapsedTime = time.time() - Mouse.lastLeftClick
-        elif Mouse._mouseState in (MouseState.RIGHT_CLICK, MouseState.RIGHT_DRAG):
-            Mouse.rightClickElapsedTime = time.time() - Mouse.lastRightClick
+    def update_elapsed_time():
+        if Mouse._mouse_state in (MouseState.CLICK, MouseState.DRAG):
+            Mouse.left_click_elapsed_time = time.time() - Mouse.last_left_click
+        elif Mouse._mouse_state in (MouseState.RIGHT_CLICK, MouseState.RIGHT_DRAG):
+            Mouse.right_click_elapsed_time = time.time() - Mouse.last_right_click
 
     @staticmethod
-    def getMouseState() -> MouseState:
-        return Mouse._mouseState
+    def get_mouse_state() -> MouseState:
+        return Mouse._mouse_state
 
     @staticmethod
-    def getMousePos() -> tuple[int, int]:
+    def get_mouse_pos() -> tuple[int, int]:
         return pygame.mouse.get_pos()
 
     @staticmethod
-    def getWheelDelta() -> int:
+    def get_wheel_delta() -> int:
         """Scroll amount for the current frame (valid while state is WHEEL_MOTION)."""
-        return Mouse._wheelDelta
+        return Mouse._wheel_delta
 
     @staticmethod
-    def setRefreshRatePerSec(refreshRate):
-        Mouse._refreshTime = 1 / refreshRate if refreshRate != 0 else 0
+    def set_refresh_rate_per_sec(refresh_rate):
+        Mouse._refresh_time = 1 / refresh_rate if refresh_rate != 0 else 0
 
     @staticmethod
-    def setMultiClickThreshold(seconds):
-        Mouse._multiClickThreshold = max(0.0, seconds)
+    def set_multi_click_threshold(seconds):
+        Mouse._multi_click_threshold = max(0.0, seconds)
 
     @staticmethod
-    def setMultiClickRadius(pixels):
-        Mouse._multiClickRadius = max(0, pixels)
+    def set_multi_click_radius(pixels):
+        Mouse._multi_click_radius = max(0, pixels)
 
 
 if __name__ == "__main__":
+    import sys
+
     pygame.init()
     win = pygame.display.set_mode((600, 600))
 
-    Mouse.setMultiClickThreshold(0.4)
-    Mouse.setMultiClickRadius(5)
+    Mouse.set_multi_click_threshold(0.4)
+    Mouse.set_multi_click_radius(5)
 
     run = True
     while run:
@@ -223,16 +228,16 @@ if __name__ == "__main__":
             if event.type == pygame.QUIT:
                 pygame.quit()
                 run = False
-                quit()
+                sys.exit()
 
             Mouse.handleEvent(event)
 
         win.fill((255, 255, 255))
 
-        Mouse.updateMouseState()
+        Mouse.update_mouse_state()
 
-        state = Mouse.getMouseState()
-        print(state, "wheel:", Mouse.getWheelDelta())
+        state = Mouse.get_mouse_state()
+        print(state, "wheel:", Mouse.get_wheel_delta())
 
         pygame.display.update()
         time.sleep(0.1)

@@ -7,8 +7,8 @@ __version__ = "1.3.2"
 
 
 def update(events: list[Event]):
-    Mouse.updateMouseState()
-    Mouse.handleEvents(events)
+    Mouse.update_mouse_state()
+    Mouse.handle_events(events)
     WidgetHandler.main(events)
 
 
