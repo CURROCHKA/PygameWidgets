@@ -1,5 +1,6 @@
 import sys
 from collections import OrderedDict
+from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from typing import Literal, NamedTuple
 
@@ -107,27 +108,57 @@ class TextBox(WidgetBase):
         repeat_interval: float = REPEAT_INTERVAL,
         cursor_interval: float = CURSOR_INTERVAL,
         double_click_interval: float = DOUBLE_CLICK_INTERVAL,
-        on_submit: callable = _empty_callback,
+        on_submit: Callable = _empty_callback,
         on_submit_params: tuple = (),
-        on_text_changed: callable = _empty_callback,
+        on_text_changed: Callable = _empty_callback,
         on_text_changed_params: tuple = (),
-        style: TextBoxStyle = None,
-        is_sub_widget=False,
-        **kwargs,
+        style: TextBoxStyle | None = None,
+        color: tuple[int, int, int] | None = None,
+        border_thickness: int | None = None,
+        border_color: tuple[int, int, int] | None = None,
+        radius: int | None = None,
+        font_size: int | None = None,
+        font: pygame.freetype.Font | None = None,
+        text_color: tuple[int, int, int] | None = None,
+        cursor_width: int | None = None,
+        cursor_color: tuple[int, int, int] | None = None,
+        cursor_alpha: int | None = None,
+        selection_color: tuple[int, int, int] | None = None,
+        text_color_under_selection: tuple[int, int, int] | None = None,
+        placeholder_text_color: tuple[int, int, int] | None = None,
+        read_only: bool | None = None,
+        tab_spaces: int | None = None,
+        lines_per_scroll: int | None = None,
+        is_sub_widget: bool = False,
     ) -> None:
-        # TODO: make text alignment
         super().__init__(win, x, y, width, height, is_sub_widget)
 
         if not pygame.get_init():
             pygame.init()
 
-        style_kwargs = {
-            k: v for k, v in kwargs.items() if k in TextBoxStyle.__dataclass_fields__
+        # Widget style
+        passed_style_args = {
+            "color": color,
+            "border_thickness": border_thickness,
+            "border_color": border_color,
+            "radius": radius,
+            "font_size": font_size,
+            "font": font,
+            "text_color": text_color,
+            "cursor_width": cursor_width,
+            "cursor_color": cursor_color,
+            "cursor_alpha": cursor_alpha,
+            "selection_color": selection_color,
+            "text_color_under_selection": text_color_under_selection,
+            "placeholder_text_color": placeholder_text_color,
+            "read_only": read_only,
+            "tab_spaces": tab_spaces,
+            "lines_per_scroll": lines_per_scroll,
         }
-        if style is None:
-            self.style = TextBoxStyle(**style_kwargs)
-        else:
-            self.style = replace(style, **style_kwargs)
+        style_overrides = {k: v for k, v in passed_style_args.items() if v is not None}
+
+        base_style = style or TextBoxStyle()
+        self.style = replace(base_style, **style_overrides)
 
         if isinstance(self.style.font, pygame.freetype.Font):
             self.font = self.style.font
@@ -153,7 +184,7 @@ class TextBox(WidgetBase):
         self.cursor_interval = cursor_interval
         self.double_click_interval = double_click_interval
 
-        # Cursor state and style
+        # Cursor state
         self.cursor = Cursor()
         self.selection_start = Cursor()
         self.selection_end = Cursor()
@@ -202,6 +233,12 @@ class TextBox(WidgetBase):
         self.max_visible_lines = max(1, self._actual_height // self.line_height)
 
         self.set_visual_lines()
+
+    def change_style(self, style: TextBoxStyle) -> None:
+        pass
+
+    def reset_style(self) -> None:
+        pass
 
     def listen(self, events: list[pygame.event.Event]) -> None:
         if self._hidden or self._disabled:
@@ -1349,26 +1386,6 @@ class TextBox(WidgetBase):
 
         return "\n".join(result)
 
-    def set(self, attr: str, value: int) -> None:
-        super().set(attr, value)
-        self.reconfigure_layout()
-
-    def set_x(self, x: int) -> None:
-        super().set_x(x)
-        self.reconfigure_layout()
-
-    def set_y(self, y: int) -> None:
-        super().set_y(y)
-        self.reconfigure_layout()
-
-    def set_width(self, width: int) -> None:
-        super().set_width(width)
-        self.reconfigure_layout()
-
-    def set_height(self, height: int) -> None:
-        super().set_height(height)
-        self.reconfigure_layout()
-
 
 if __name__ == "__main__":
 
@@ -1412,9 +1429,9 @@ if __name__ == "__main__":
                 run = False
                 sys.exit()
             # elif outer_event.type == pygame.KEYDOWN:
-            #     if outer_event.key == pygame.K_k:
-            #         dark_theme.color = (255, 255, 255)
-            #         dark_theme.text_color = (0, 0, 0)
+            # if outer_event.key == pygame.K_k:
+            # input_login.style.color = (255, 255, 255)
+            # input_login.style.text_color = (0, 0, 0)
 
         win.fill((255, 255, 255))
 
