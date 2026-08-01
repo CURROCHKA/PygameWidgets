@@ -737,11 +737,12 @@ class TextBox(WidgetBase):
 
     def jump_to_edge(self, event: pygame.Event, direction: Literal[-1, 1]) -> None:
         shift_pressed = bool(event.mod & pygame.KMOD_SHIFT)
+        ctrl_pressed = bool(event.mod & pygame.KMOD_CTRL)
 
         if shift_pressed and self.is_empty_selection():
             self.selection_start.set(self.cursor.line, self.cursor.column, self.text)
 
-        if event.mod & pygame.KMOD_CTRL:
+        if ctrl_pressed:
             line = 0 if direction == -1 else len(self.text) - 1
             column = 0 if direction == -1 else len(self.text[-1])
             self.cursor.set(line, column, self.text)
