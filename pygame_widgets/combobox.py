@@ -1,6 +1,6 @@
 import pygame_widgets
 from pygame_widgets.dropdown import Dropdown, DropdownChoice
-from pygame_widgets.textbox import TextBox
+from pygame_widgets.textbox_legacy import TextBox
 from pygame_widgets.widget import WidgetBase
 
 

@@ -1025,6 +1025,14 @@ class TextBox(WidgetBase):
         Returns:
             Visual-line fragments that cover the whole logical line.
         """
+        # TODO: Fix the cursor transfer error.
+        # When you enter a space and a long word that has moved to the next line,
+        # and press the up arrow, the cursor moves to the left edge -
+        # the beginning of the current line
+        # (=the end of the top line with a space at the end),
+        # but the cursor should be on the top line.
+        # This is probably because the cursor moves to the next (bottom) line when it is at the end of the current line.
+
         if line == "":
             return [self._make_visual_line("", line_index, 0)]
 
