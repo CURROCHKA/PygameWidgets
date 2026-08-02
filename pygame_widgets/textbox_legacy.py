@@ -98,7 +98,7 @@ class TextBox(WidgetBase):
 
     def __init__(
         self,
-        win: pygame.Surface,
+        surface: pygame.Surface,
         x: int,
         y: int,
         width: int,
@@ -131,7 +131,7 @@ class TextBox(WidgetBase):
         lines_per_scroll: int | None = None,
         is_sub_widget: bool = False,
     ) -> None:
-        super().__init__(win, x, y, width, height, is_sub_widget)
+        super().__init__(surface, x, y, width, height, is_sub_widget)
 
         if not pygame.get_init():
             pygame.init()
@@ -380,7 +380,7 @@ class TextBox(WidgetBase):
             text: str, color: ColorLike, x: float, y: float, style: int = 0
         ):
             text_surface = self.get_rendered_text_surface(text, color, style)
-            self.win.blit(text_surface, (x, y))
+            self._surface.blit(text_surface, (x, y))
 
         if self.is_empty_text(self.text):
             display_lines = [
@@ -480,7 +480,7 @@ class TextBox(WidgetBase):
 
                 if not self.insert_on:
                     pygame.draw.line(
-                        self.win,
+                        self._surface,
                         self.style.cursor_color,
                         (start_x, start_y),
                         (end_x, end_y),
@@ -499,11 +499,11 @@ class TextBox(WidgetBase):
                     cursor_surface = pygame.Surface(text_surface.get_size())
                     cursor_surface.fill(self.style.cursor_color)
                     cursor_surface.set_alpha(self.style.cursor_alpha)
-                    self.win.blit(cursor_surface, (start_x, start_y))
+                    self._surface.blit(cursor_surface, (start_x, start_y))
 
     def _draw_border(self) -> None:
         pygame.draw.rect(
-            self.win,
+            self._surface,
             self.style.border_color,
             (self._x, self._y, self._width, self._height),
             border_radius=self.style.radius,
@@ -517,7 +517,7 @@ class TextBox(WidgetBase):
             self._height - self.style.border_thickness * 2,
         )
         pygame.draw.rect(
-            self.win, self.style.color, rect, border_radius=self.style.radius
+            self._surface, self.style.color, rect, border_radius=self.style.radius
         )
 
     def _draw_selection(self) -> None:
@@ -579,7 +579,7 @@ class TextBox(WidgetBase):
                 text_width += self.get_text_width(" ")
 
             pygame.draw.rect(
-                self.win,
+                self._surface,
                 self.style.selection_color,
                 (
                     self._actual_x + text_before_width,
@@ -1403,7 +1403,7 @@ if __name__ == "__main__":
         textbox.set_text("")
 
     pygame.init()
-    win = pygame.display.set_mode((1000, 600))
+    _surface = pygame.display.set_mode((1000, 600))
 
     clock = pygame.time.Clock()
 
@@ -1411,11 +1411,11 @@ if __name__ == "__main__":
     #     color=(30, 30, 30), text_color=(240, 240, 240), font_size=24
     # )
 
-    # input_login = TextBox(win, 100, 100, 400, 50, style=dark_theme)
-    # input_password = TextBox(win, 100, 200, 400, 50, style=dark_theme)
+    # input_login = TextBox(_surface, 100, 100, 400, 50, style=dark_theme)
+    # input_password = TextBox(_surface, 100, 200, 400, 50, style=dark_theme)
 
     textbox = TextBox(
-        win,
+        _surface,
         x=100,
         y=100,
         width=800,
@@ -1442,7 +1442,7 @@ if __name__ == "__main__":
             # input_login.style.color = (255, 255, 255)
             # input_login.style.text_color = (0, 0, 0)
 
-        win.fill((255, 255, 255))
+        _surface.fill((255, 255, 255))
 
         pygame_widgets.update(outer_events)
         pygame.display.update()

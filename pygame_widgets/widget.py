@@ -87,7 +87,7 @@ class WidgetBase(ABC):
 
     def __init__(
         self,
-        win: pygame.Surface,
+        surface: pygame.Surface,
         x: float,
         y: float,
         width: float,
@@ -97,7 +97,7 @@ class WidgetBase(ABC):
         """Initialize common widget state.
 
         Args:
-            win: Surface on which the widget is drawn.
+            surface: Surface on which the widget is drawn.
             x: X-coordinate of the widget's top-left corner.
             y: Y-coordinate of the widget's top-left corner.
             width: Widget width.
@@ -105,9 +105,9 @@ class WidgetBase(ABC):
             is_sub_widget: Whether this widget is owned and drawn by another
                 widget instead of being managed directly by ``WidgetHandler``.
         """
-        self.win = win
-        self._x = x
-        self._y = y
+        self.surface = surface
+        self.x = x
+        self.y = y
         self._width = width
         self._height = height
         self._is_sub_widget = is_sub_widget
@@ -118,16 +118,47 @@ class WidgetBase(ABC):
         if not is_sub_widget:
             WidgetHandler.add_widget(self)
 
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}(x = {self.x}, y = {self.y}, width = {self._width}, height = {self._height})"
+
+    @property
+    def width(self) -> float:
+        return self._width
+
+    @width.setter
+    def width(self, value: float) -> None:
+        self._width = value
+        # TODO: call widget width setter
+
+    @property
+    def height(self) -> float:
+        return self._height
+
+    @height.setter
+    def height(self, value: float) -> None:
+        self._height = value
+        # TODO: call widget height setter
+
+    @property
+    def is_sub_widget(self) -> bool:
+        return self._is_sub_widget
+
+    @is_sub_widget.setter
+    def is_sub_widget(self, value: bool) -> None:
+        """Update sub-widget ownership and global handler registration."""
+        self._is_sub_widget = value
+        if value:
+            WidgetHandler.remove_widget(self)
+        else:
+            WidgetHandler.add_widget(self)
+
     @abstractmethod
     def listen(self, events: list[pygame.Event]) -> None:
         """Handle input events for this frame."""
 
     @abstractmethod
     def draw(self) -> None:
-        """Draw the widget's current state to ``self.win``."""
-
-    def __repr__(self) -> str:
-        return f"{type(self).__name__}(x = {self._x}, y = {self._y}, width = {self._width}, height = {self._height})"
+        """Draw the widget's current state to ``self.surface``."""
 
     def contains(self, x: float, y: float) -> bool:
         """Return whether a point lies inside the widget bounds.
@@ -140,19 +171,19 @@ class WidgetBase(ABC):
             ``True`` when the point is strictly inside this widget's rectangle.
         """
         return (
-            self._x < x - self.win.get_abs_offset()[0] < self._x + self._width
-        ) and (self._y < y - self.win.get_abs_offset()[1] < self._y + self._height)
+            self.x < x - self.surface.get_abs_offset()[0] < self.x + self._width
+        ) and (self.y < y - self.surface.get_abs_offset()[1] < self.y + self._height)
 
     def hide(self) -> None:
         """Hide the widget and move it behind other top-level widgets."""
         self._hidden = True
-        if not self._is_sub_widget:
+        if not self.is_sub_widget:
             WidgetHandler.move_to_bottom(self)
 
     def show(self) -> None:
         """Show the widget and move it above other top-level widgets."""
         self._hidden = False
-        if not self._is_sub_widget:
+        if not self.is_sub_widget:
             WidgetHandler.move_to_top(self)
 
     def disable(self) -> None:
@@ -163,10 +194,6 @@ class WidgetBase(ABC):
         """Allow the widget to handle input."""
         self._disabled = False
 
-    def is_sub_widget(self) -> bool:
-        """Return whether this widget is managed by a parent widget."""
-        return self._is_sub_widget
-
     def move_to_top(self) -> None:
         """Move this widget to the top of the global draw/event order."""
         WidgetHandler.move_to_top(self)
@@ -175,52 +202,6 @@ class WidgetBase(ABC):
         """Move this widget to the bottom of the global draw/event order."""
         WidgetHandler.move_to_bottom(self)
 
-    def move_x(self, x: float) -> None:
-        """Move the widget horizontally by ``x`` pixels."""
-        self._x += x
-
-    def move_y(self, y: float) -> None:
-        """Move the widget vertically by ``y`` pixels."""
-        self._y += y
-
-    def get(self, attr: str) -> Any | None:
-        """Return a supported widget attribute value.
-
-        The base class supports ``'x'``, ``'y'``, ``'width'`` and ``'height'``.
-        Subclasses may extend this method with widget-specific attributes and
-        should call ``super().get(attr)`` for the shared geometry attributes.
-
-        Args:
-            attr: Attribute name to read.
-
-        Returns:
-            Attribute value, or ``None`` when the attribute is not supported.
-        """
-        if attr == "x":
-            return self._x
-        elif attr == "y":
-            return self._y
-        elif attr == "width":
-            return self._width
-        elif attr == "height":
-            return self._height
-
-    def get_x(self) -> int | float:
-        """Return the widget's x-coordinate."""
-        return self._x
-
-    def get_y(self) -> int | float:
-        """Return the widget's y-coordinate."""
-        return self._y
-
-    def get_width(self) -> int | float:
-        """Return the widget width."""
-        return self._width
-
-    def get_height(self) -> int | float:
-        """Return the widget height."""
-        return self._height
-
     def is_visible(self) -> bool:
         """Return whether the widget is visible."""
         return not self._hidden
@@ -228,51 +209,6 @@ class WidgetBase(ABC):
     def is_enabled(self) -> bool:
         """Return whether the widget can handle input."""
         return not self._disabled
-
-    def set(self, attr: str, value: Any) -> None:
-        """Set a supported widget attribute value.
-
-        The base class supports ``'x'``, ``'y'``, ``'width'`` and ``'height'``.
-        Subclasses may extend this method with widget-specific attributes and
-        should call ``super().set(attr, value)`` for the shared geometry
-        attributes.
-
-        Args:
-            attr: Attribute name to update.
-            value: New attribute value.
-        """
-        if attr == "x":
-            self._x = value
-        elif attr == "y":
-            self._y = value
-        elif attr == "width":
-            self._width = value
-        elif attr == "height":
-            self._height = value
-
-    def set_x(self, x: float) -> None:
-        """Set the widget's x-coordinate."""
-        self._x = x
-
-    def set_y(self, y: float) -> None:
-        """Set the widget's y-coordinate."""
-        self._y = y
-
-    def set_width(self, width: float) -> None:
-        """Set the widget width."""
-        self._width = width
-
-    def set_height(self, height: float) -> None:
-        """Set the widget height."""
-        self._height = height
-
-    def set_is_sub_widget(self, is_sub_widget: bool) -> None:
-        """Update sub-widget ownership and global handler registration."""
-        self._is_sub_widget = is_sub_widget
-        if is_sub_widget:
-            WidgetHandler.remove_widget(self)
-        else:
-            WidgetHandler.add_widget(self)
 
 
 class WidgetHandler:
