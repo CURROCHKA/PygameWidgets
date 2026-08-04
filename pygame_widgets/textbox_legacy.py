@@ -18,6 +18,9 @@ def _empty_callback() -> None:
     pass
 
 
+# TODO: delete magic numbers, tuples (colors), etc
+
+
 @dataclass(order=True)
 class Cursor:
     line: int = 0
@@ -218,17 +221,17 @@ class TextBox(WidgetBase):
 
     def reconfigure_layout(self) -> None:
         self._actual_width = (
-            self._width
+            self.width
             - self.text_offset_right
             - self.text_offset_left
             - self.style.border_thickness * 2
         )
         self._actual_height = (
-            self._height - self.text_offset_top - self.style.border_thickness * 2
+            self.height - self.text_offset_top - self.style.border_thickness * 2
         )
         self.line_height = self.style.font_size
-        self._actual_x = self._x + self.text_offset_left + self.style.border_thickness
-        self._actual_y = self._y + self.text_offset_top + self.style.border_thickness
+        self._actual_x = self.x + self.text_offset_left + self.style.border_thickness
+        self._actual_y = self.y + self.text_offset_top + self.style.border_thickness
 
         self.max_visible_lines = max(1, self._actual_height // self.line_height)
 
@@ -380,7 +383,7 @@ class TextBox(WidgetBase):
             text: str, color: ColorLike, x: float, y: float, style: int = 0
         ):
             text_surface = self.get_rendered_text_surface(text, color, style)
-            self._surface.blit(text_surface, (x, y))
+            self.surface.blit(text_surface, (x, y))
 
         if self.is_empty_text(self.text):
             display_lines = [
@@ -480,7 +483,7 @@ class TextBox(WidgetBase):
 
                 if not self.insert_on:
                     pygame.draw.line(
-                        self._surface,
+                        self.surface,
                         self.style.cursor_color,
                         (start_x, start_y),
                         (end_x, end_y),
@@ -499,25 +502,25 @@ class TextBox(WidgetBase):
                     cursor_surface = pygame.Surface(text_surface.get_size())
                     cursor_surface.fill(self.style.cursor_color)
                     cursor_surface.set_alpha(self.style.cursor_alpha)
-                    self._surface.blit(cursor_surface, (start_x, start_y))
+                    self.surface.blit(cursor_surface, (start_x, start_y))
 
     def _draw_border(self) -> None:
         pygame.draw.rect(
-            self._surface,
+            self.surface,
             self.style.border_color,
-            (self._x, self._y, self._width, self._height),
+            (self.x, self.y, self.width, self.height),
             border_radius=self.style.radius,
         )
 
     def _draw_background(self) -> None:
         rect = (
-            self._x + self.style.border_thickness,
-            self._y + self.style.border_thickness,
-            self._width - self.style.border_thickness * 2,
-            self._height - self.style.border_thickness * 2,
+            self.x + self.style.border_thickness,
+            self.y + self.style.border_thickness,
+            self.width - self.style.border_thickness * 2,
+            self.height - self.style.border_thickness * 2,
         )
         pygame.draw.rect(
-            self._surface, self.style.color, rect, border_radius=self.style.radius
+            self.surface, self.style.color, rect, border_radius=self.style.radius
         )
 
     def _draw_selection(self) -> None:
@@ -579,7 +582,7 @@ class TextBox(WidgetBase):
                 text_width += self.get_text_width(" ")
 
             pygame.draw.rect(
-                self._surface,
+                self.surface,
                 self.style.selection_color,
                 (
                     self._actual_x + text_before_width,
@@ -915,7 +918,7 @@ class TextBox(WidgetBase):
 
     def update_layout(self) -> None:
         self._actual_height = (
-            self._height - self.text_offset_top - self.style.border_thickness * 2
+            self.height - self.text_offset_top - self.style.border_thickness * 2
         )
 
         self.max_visible_lines = max(1, self._actual_height // self.line_height)
@@ -1403,7 +1406,7 @@ if __name__ == "__main__":
         textbox.set_text("")
 
     pygame.init()
-    _surface = pygame.display.set_mode((1000, 600))
+    surface = pygame.display.set_mode((1000, 600))
 
     clock = pygame.time.Clock()
 
@@ -1411,11 +1414,11 @@ if __name__ == "__main__":
     #     color=(30, 30, 30), text_color=(240, 240, 240), font_size=24
     # )
 
-    # input_login = TextBox(_surface, 100, 100, 400, 50, style=dark_theme)
-    # input_password = TextBox(_surface, 100, 200, 400, 50, style=dark_theme)
+    # input_login = TextBox(surface, 100, 100, 400, 50, style=dark_theme)
+    # input_password = TextBox(surface, 100, 200, 400, 50, style=dark_theme)
 
     textbox = TextBox(
-        _surface,
+        surface,
         x=100,
         y=100,
         width=800,
@@ -1442,7 +1445,7 @@ if __name__ == "__main__":
             # input_login.style.color = (255, 255, 255)
             # input_login.style.text_color = (0, 0, 0)
 
-        _surface.fill((255, 255, 255))
+        surface.fill((255, 255, 255))
 
         pygame_widgets.update(outer_events)
         pygame.display.update()
