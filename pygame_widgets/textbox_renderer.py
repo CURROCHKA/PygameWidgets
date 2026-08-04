@@ -1,13 +1,12 @@
-from __future__ import annotations
-
 from collections import OrderedDict
 from dataclasses import dataclass
 
 import pygame.freetype
-
 from pygame.typing import ColorLike
-from pygame_widgets.textbox_style import TextBoxStyle
+
 from pygame_widgets.textbox_layout import VisualLine
+from pygame_widgets.textbox_style import TextBoxStyle
+
 
 @dataclass(frozen=True)
 class TextBoxRenderState:
@@ -57,7 +56,7 @@ class TextBoxRenderer:
     def __init__(self, render_cache_size: int = RENDER_CACHE_SIZE) -> None:
         self._rendered_text_cache: OrderedDict = OrderedDict()
         self._render_cache_size = render_cache_size
-        
+
     def _visible_range(self, state: TextBoxRenderState) -> range:
         return range(
             state.first_visible_line_index,
@@ -102,16 +101,22 @@ class TextBoxRenderer:
             border_radius=state.style.radius,
         )
 
-    def _draw_background(self, surface: pygame.Surface, state: TextBoxRenderState) -> None:
+    def _draw_background(
+        self, surface: pygame.Surface, state: TextBoxRenderState
+    ) -> None:
         rect = (
             state.x + state.style.border_thickness,
             state.y + state.style.border_thickness,
             state.width - state.style.border_thickness * 2,
             state.height - state.style.border_thickness * 2,
         )
-        pygame.draw.rect(surface, state.style.color, rect, border_radius=state.style.radius)
+        pygame.draw.rect(
+            surface, state.style.color, rect, border_radius=state.style.radius
+        )
 
-    def _draw_selection(self, surface: pygame.Surface, state: TextBoxRenderState) -> None:
+    def _draw_selection(
+        self, surface: pygame.Surface, state: TextBoxRenderState
+    ) -> None:
         if state.selection is None:
             return
 
@@ -126,10 +131,16 @@ class TextBoxRenderer:
             if not (start_line <= line_index <= end_line):
                 continue
 
-            line_y = state.actual_y + state.line_height * (i - state.first_visible_line_index)
+            line_y = state.actual_y + state.line_height * (
+                i - state.first_visible_line_index
+            )
 
             col_start = start_col if line_index == start_line else 0
-            col_end = end_col if line_index == end_line else state.logical_line_lengths[line_index]
+            col_end = (
+                end_col
+                if line_index == end_line
+                else state.logical_line_lengths[line_index]
+            )
 
             local_start = max(0, col_start - line_start)
             local_end = min(len(text), col_end - line_start)
@@ -144,7 +155,9 @@ class TextBoxRenderer:
                 and line_start + len(text) == state.logical_line_lengths[line_index]
             )
 
-            if local_start == local_end and not (is_empty_line or is_end_of_logical_line):
+            if local_start == local_end and not (
+                is_empty_line or is_end_of_logical_line
+            ):
                 continue
 
             text_before_width = visual_line.get_offset(local_start)
@@ -157,7 +170,12 @@ class TextBoxRenderer:
             pygame.draw.rect(
                 surface,
                 state.style.selection_color,
-                (state.actual_x + text_before_width, line_y, text_width, state.line_height),
+                (
+                    state.actual_x + text_before_width,
+                    line_y,
+                    text_width,
+                    state.line_height,
+                ),
             )
 
     def _draw_text(self, surface: pygame.Surface, state: TextBoxRenderState) -> None:
@@ -174,16 +192,23 @@ class TextBoxRenderer:
             text = visual_line.text
             line_index = visual_line.line_index
             line_start = visual_line.start_at
-            line_y = state.actual_y + (i - state.first_visible_line_index) * state.line_height
+            line_y = (
+                state.actual_y
+                + (i - state.first_visible_line_index) * state.line_height
+            )
 
             if selection is None:
                 draw_segment(text, state.display_color, state.actual_x, line_y)
                 continue
 
             (start_line, start_col), (end_line, end_col) = selection
-            
+
             col_start = start_col if line_index == start_line else 0
-            col_end = end_col if line_index == end_line else state.logical_line_lengths[line_index]
+            col_end = (
+                end_col
+                if line_index == end_line
+                else state.logical_line_lengths[line_index]
+            )
 
             local_start = max(0, col_start - line_start)
             local_end = min(len(text), col_end - line_start)
@@ -232,7 +257,9 @@ class TextBoxRenderer:
         visual_line = state.display_lines[index]
         local_column = state.cursor_column - visual_line.start_at
         x = state.actual_x + visual_line.get_offset(local_column)
-        y = state.actual_y + state.line_height * (index - state.first_visible_line_index)
+        y = state.actual_y + state.line_height * (
+            index - state.first_visible_line_index
+        )
 
         if not state.overwrite_mode:
             pygame.draw.line(

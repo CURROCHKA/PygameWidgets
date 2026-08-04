@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 
 import pygame.freetype
 
@@ -189,3 +189,98 @@ class TextLayoutManager:
                     return line_index + 1
                 return line_index
         return -1
+
+    def get_cursor_pos_from_mouse(
+        self,
+        mouse_x: float,
+        mouse_y: float,
+        actual_x: int,
+        actual_y: int,
+        actual_height: int,
+        line_height: int,
+        first_visible_line_index: int,
+        max_visible_lines: int,
+    ) -> tuple[int, int] | None:
+        """Calculate logical (line, column) cursor position from screen mouse coordinates."""
+        if not self.cached_visual_lines:
+            return
+
+        clamped_y = max(actual_y, min(mouse_y, actual_y + actual_height - 1))
+
+        raw_index = first_visible_line_index + int(
+            (clamped_y - actual_y) // line_height
+        )
+        visual_line_index = max(
+            first_visible_line_index,
+            min(
+                raw_index,
+                first_visible_line_index + max_visible_lines - 1,
+                len(self.cached_visual_lines) - 1,
+            ),
+        )
+
+        visual_line = self.cached_visual_lines[visual_line_index]
+
+        if len(visual_line.text) == 0:
+            return visual_line.line_index, visual_line.start_at
+
+        relative_x = mouse_x - actual_x
+        prefix_widths = visual_line.prefix_widths
+        local_column = len(visual_line.text)
+
+        for column in range(len(visual_line.text)):
+            midpoint = (prefix_widths[column] + prefix_widths[column + 1]) / 2
+            if relative_x < midpoint:
+                local_column = column
+                break
+
+        return visual_line.line_index, visual_line.start_at + local_column
+
+    def get_vertical_cursor_target(
+        self,
+        logical_line: int,
+        logical_column: int,
+        preferred_column: int,
+        direction: Literal["up", "down"],
+    ) -> tuple[int, int] | None:
+        """Calculate target logical (line, column) for vertical cursor movement across visual lines.
+
+        Args:
+            logical_line: Current logical line index.
+            logical_column: Current logical column index.
+            preferred_column: Target visual column offset remembered from horizontal motion/click.
+            direction: "up" or "down".
+
+        Returns:
+            Tuple of (target_line, target_column) or None if layout is empty.
+        """
+        visual_line_index = self.get_visual_line_index(logical_line, logical_column)
+        if visual_line_index == -1:
+            return None
+
+        match direction:
+            case "up":
+                offset = -1
+                fallback_target = logical_line, 0
+            case "down":
+                offset = 1
+                current_line = self.cached_visual_lines[visual_line_index]
+                fallback_target = (
+                    logical_line,
+                    current_line.start_at + len(current_line.text),
+                )
+            case _:
+                raise ValueError(
+                    "An incorrect direction value has been entered. Expected Literal['up', 'down']"
+                )
+
+        target_index = visual_line_index + offset
+
+        if 0 <= target_index < len(self.cached_visual_lines):
+            target_line = self.cached_visual_lines[target_index]
+            desired_column = min(
+                target_line.start_at + preferred_column,
+                target_line.start_at + len(target_line.text),
+            )
+            return target_line.line_index, desired_column
+        return fallback_target
