@@ -759,7 +759,7 @@ class TextBox(WidgetBase):
 
                 self.cursor.set(self.cursor.line, column, self.text)
 
-        if event.mod & pygame.KMOD_SHIFT:
+        if shift_pressed:
             self.selection_end.set(self.cursor.line, self.cursor.column, self.text)
         else:
             self.reset_selection()
@@ -916,13 +916,6 @@ class TextBox(WidgetBase):
             0, min(self.first_visible_line_index, max_scroll)
         )
 
-    def update_layout(self) -> None:
-        self._actual_height = (
-            self.height - self.text_offset_top - self.style.border_thickness * 2
-        )
-
-        self.max_visible_lines = max(1, self._actual_height // self.line_height)
-
     def add_text(self, text: str, call_on_text_changed: bool = True) -> None:
         if not self.is_empty_selection():
             self.erase_selected_text(call_on_text_changed=False)
@@ -1000,8 +993,6 @@ class TextBox(WidgetBase):
 
             range_end = len(self.cached_visual_lines)
             self.visual_line_ranges[line_index] = (range_start, range_end)
-
-        self.update_layout()
 
     def _wrap_logical_line(self, line: str, line_index: int) -> list[VisualLine]:
         """Soft-wrap a single logical line into ``VisualLine`` fragments.

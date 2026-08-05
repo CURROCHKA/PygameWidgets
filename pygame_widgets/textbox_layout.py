@@ -190,7 +190,7 @@ class TextLayoutManager:
                 return line_index
         return -1
 
-    def get_cursor_pos_from_mouse(
+    def get_cursor_from_mouse(
         self,
         mouse_x: float,
         mouse_y: float,
@@ -235,6 +235,24 @@ class TextLayoutManager:
                 break
 
         return visual_line.line_index, visual_line.start_at + local_column
+
+    def get_edge_cursor_target(
+        self, logical_line: int, logical_column: int, direction: Literal["home", "end"]
+    ) -> tuple[int, int] | None:
+        match direction:
+            case "home":
+                factor = 0
+            case "end":
+                factor = 1
+            case _:
+                raise ValueError(
+                    "An incorrect direction value has been entered. Expected Literal['home', 'end']"
+                )
+        visual_line_index = self.get_visual_line_index(logical_line, logical_column)
+        if visual_line_index != -1:
+            visual_line = self.cached_visual_lines[visual_line_index]
+            column = visual_line.start_at + len(visual_line.text) * factor
+            return logical_line, column
 
     def get_vertical_cursor_target(
         self,
