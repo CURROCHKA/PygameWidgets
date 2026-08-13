@@ -9,6 +9,7 @@ class VisualLine(NamedTuple):
     line_index: int
     start_at: int
     prefix_widths: list[int]
+    logical_line_length: int
 
     def get_offset(self, column: int) -> int:
         """Return the x offset for a cursor column within this visual line.
@@ -50,7 +51,13 @@ class TextLayoutManager:
 
         if not logical_lines or (len(logical_lines) == 1 and logical_lines[0] == ""):
             # Handle empty state
-            line = VisualLine(text="", line_index=0, start_at=0, prefix_widths=[0])
+            line = VisualLine(
+                text="",
+                line_index=0,
+                start_at=0,
+                prefix_widths=[0],
+                logical_line_length=0,
+            )
             self.cached_visual_lines.append(line)
             self.visual_line_ranges[0] = (0, 1)
             return
@@ -70,24 +77,29 @@ class TextLayoutManager:
         self, line: str, line_index: int, actual_width: int, font: pygame.freetype.Font
     ) -> list[VisualLine]:
         if line == "":
-            return [self._make_visual_line("", line_index, 0, font)]
+            return [self._make_visual_line("", line_index, 0, font, 0)]
 
         visual_lines = []
         start = 0
+        line_length = len(line)
 
         while start < len(line):
             end = self._find_visual_line_end(line, start, actual_width, font)
 
             if end == len(line):
                 visual_lines.append(
-                    self._make_visual_line(line[start:end], line_index, start, font)
+                    self._make_visual_line(
+                        line[start:end], line_index, start, font, line_length
+                    )
                 )
                 break
 
             if end == start:
                 end = start + 1
                 visual_lines.append(
-                    self._make_visual_line(line[start:end], line_index, start, font)
+                    self._make_visual_line(
+                        line[start:end], line_index, start, font, line_length
+                    )
                 )
                 start = end
                 continue
@@ -100,26 +112,38 @@ class TextLayoutManager:
             if can_wrap_by_space:
                 visual_lines.append(
                     self._make_visual_line(
-                        line[start : last_space + 1], line_index, start, font
+                        line[start : last_space + 1],
+                        line_index,
+                        start,
+                        font,
+                        line_length,
                     )
                 )
                 start = last_space + 1
             else:
                 visual_lines.append(
-                    self._make_visual_line(line[start:end], line_index, start, font)
+                    self._make_visual_line(
+                        line[start:end], line_index, start, font, line_length
+                    )
                 )
                 start = end
 
         return visual_lines
 
     def _make_visual_line(
-        self, text: str, line_index: int, start_at: int, font: pygame.freetype.Font
+        self,
+        text: str,
+        line_index: int,
+        start_at: int,
+        font: pygame.freetype.Font,
+        logical_line_length: int,
     ) -> VisualLine:
         return VisualLine(
             text=text,
             line_index=line_index,
             start_at=start_at,
             prefix_widths=self._build_prefix_widths(text, font),
+            logical_line_length=logical_line_length,
         )
 
     def _find_visual_line_end(
@@ -302,3 +326,12 @@ class TextLayoutManager:
             )
             return target_line.line_index, desired_column
         return fallback_target
+
+    def get_local_column(self, logical_line: int, logical_column: int) -> int:
+        visual_line_index = self.get_visual_line_index(logical_line, logical_column)
+        if visual_line_index == -1:
+            return 0
+
+        visual_line = self.cached_visual_lines[visual_line_index]
+
+        return logical_column - visual_line.start_at

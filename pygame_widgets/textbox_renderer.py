@@ -1,7 +1,7 @@
 from collections import OrderedDict
 from dataclasses import dataclass
 
-import pygame.freetype
+import pygame
 from pygame.typing import ColorLike
 
 from pygame_widgets.textbox_layout import VisualLine
@@ -26,12 +26,10 @@ class TextBoxRenderState:
 
     # Appearance
     style: TextBoxStyle
-    font: pygame.freetype.Font
 
     # Content — placeholder-vs-real already resolved by the caller
     display_lines: list[VisualLine]
     display_color: ColorLike
-    logical_line_lengths: list[int]
     space_width: int  # width of " " in the current font/style
 
     # Selection: normalized (start_line, start_col), (end_line, end_col), or None if empty
@@ -80,7 +78,7 @@ class TextBoxRenderer:
         color: ColorLike,
         style: int = 0,
     ) -> pygame.Surface:
-        cache_key = (id(state.font), text, color, style)
+        cache_key = (id(state.style.font), text, color, style)
 
         if cache_key in self._rendered_text_cache:
             self._rendered_text_cache.move_to_end(cache_key)
@@ -89,7 +87,7 @@ class TextBoxRenderer:
         if len(self._rendered_text_cache) >= self._render_cache_size:
             self._rendered_text_cache.popitem(last=False)
 
-        rendered = state.font.render(text, fgcolor=color, style=style)[0]
+        rendered = state.style.font.render(text, fgcolor=color, style=style)[0]
         self._rendered_text_cache[cache_key] = rendered
         return rendered
 
@@ -137,9 +135,7 @@ class TextBoxRenderer:
 
             col_start = start_col if line_index == start_line else 0
             col_end = (
-                end_col
-                if line_index == end_line
-                else state.logical_line_lengths[line_index]
+                end_col if line_index == end_line else visual_line.logical_line_length
             )
 
             local_start = max(0, col_start - line_start)
@@ -148,11 +144,11 @@ class TextBoxRenderer:
             if local_start > local_end:
                 continue
 
-            is_empty_line = state.logical_line_lengths[line_index] == 0
+            is_empty_line = visual_line.logical_line_length == 0
             is_end_of_logical_line = (
                 line_index < end_line
                 and local_end == len(text)
-                and line_start + len(text) == state.logical_line_lengths[line_index]
+                and line_start + len(text) == visual_line.logical_line_length
             )
 
             if local_start == local_end and not (
@@ -205,9 +201,7 @@ class TextBoxRenderer:
 
             col_start = start_col if line_index == start_line else 0
             col_end = (
-                end_col
-                if line_index == end_line
-                else state.logical_line_lengths[line_index]
+                end_col if line_index == end_line else visual_line.logical_line_length
             )
 
             local_start = max(0, col_start - line_start)

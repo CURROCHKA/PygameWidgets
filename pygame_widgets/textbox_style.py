@@ -4,6 +4,9 @@ import pygame.freetype
 from pygame.typing import ColorLike
 
 
+# TODO: CursorStyle
+
+
 @dataclass
 class TextBoxStyle:
     color: ColorLike = (220, 220, 220)
@@ -32,3 +35,10 @@ class TextBoxStyle:
     tab_spaces: int = 4
 
     lines_per_scroll: int = 1
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.font, pygame.freetype.Font):
+            if self.font:
+                raise ValueError("Use pygame.freetype.Font or pygame.freetype.SysFont")
+            self.font = pygame.freetype.SysFont("calibri", self.font_size)
+        self.font.pad = True

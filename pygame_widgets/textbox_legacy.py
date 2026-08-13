@@ -1,4 +1,3 @@
-import sys
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
@@ -9,7 +8,6 @@ import pygame.freetype
 import pyperclip
 from pygame.typing import ColorLike
 
-import pygame_widgets
 from pygame_widgets.mouse import Mouse, MouseState
 from pygame_widgets.widget import WidgetBase
 
@@ -1391,6 +1389,9 @@ class TextBox(WidgetBase):
 
 
 if __name__ == "__main__":
+    import sys
+    import pygame_widgets
+    
 
     def output():
         print(textbox.get_text())
