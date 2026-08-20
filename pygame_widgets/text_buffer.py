@@ -1,6 +1,8 @@
 from collections.abc import Callable
 from typing import Literal, NamedTuple
 
+# TODO: return erased strings after erase...() func like .pop()
+
 
 def _empty_callback(*args) -> None:
     pass
@@ -21,7 +23,7 @@ class TextBuffer:
     ) -> None:
         self._lines = [""]
 
-        self._cursor = Cursor()
+        self._cursor = Cursor(0, 0)
         self._selection_anchor: Cursor | None = None
 
         self.tab_spaces = tab_spaces
@@ -33,15 +35,15 @@ class TextBuffer:
         self.overwrite_mode = False
 
         if initial_text:
-            self.text = initial_text
+            self._set_text(initial_text, False)
 
     def _validate_cursor_coord(self, line: int, column: int) -> None:
-        if not (0 <= line < len(self.lines)):
+        if not (0 <= line < len(self._lines)):
             raise ValueError(
-                f"Line index {line} out of range (0 - {len(self.lines) - 1})"
+                f"Line index {line} out of range (0 - {len(self._lines) - 1})"
             )
 
-        if not (0 <= column <= len(self.lines[line])):
+        if not (0 <= column <= len(self._lines[line])):
             raise ValueError(f"Column index {column} out of range for line {line}")
 
     @property
@@ -69,38 +71,35 @@ class TextBuffer:
         start, end = selection
 
         if start.line == end.line:
-            return self.lines[start.line][start.column : end.column]
+            return self._lines[start.line][start.column : end.column]
 
         result = []
 
-        result.append(self.lines[start.line][start.column :])
-        result.extend(self.lines[start.line + 1 : end.line])
-        result.append(self.lines[end.line][: end.column])
+        result.append(self._lines[start.line][start.column :])
+        result.extend(self._lines[start.line + 1 : end.line])
+        result.append(self._lines[end.line][: end.column])
 
         return "\n".join(result)
 
     @property
-    def lines(self) -> list[str]:
-        # TODO: Protect for API (text_buffer.lines.clear() may brake the system)
-        return self._lines
-
-    @property
     def text(self) -> str:
-        return "\n".join(self.lines)
+        return "\n".join(self._lines)
 
     @text.setter
     def text(self, value: str) -> None:
+        self._set_text(value, True)
+
+    def _set_text(self, text: str, call_on_text_changed: bool) -> None:
         self._lines = [""]
         self._cursor = Cursor(0, 0)
         self.reset_selection()
-        self.add_text(
-            value, call_on_text_changed=False
-        )  # TODO: Maybe it's worth setting a new flag or always pass call_on_text_changed=True
+        self.add_text(text, call_on_text_changed)
 
-    def is_empty_lines(self, lines: list[str]) -> bool:
-        return len(lines) == 1 and lines[0] == ""
+    def is_empty_lines(self) -> bool:
+        return self._lines == [""]
 
-    def is_word_char(self, character: str) -> bool:
+    @staticmethod
+    def is_word_char(character: str) -> bool:
         return character.isalnum() or character == "_"
 
     def is_empty_selection(self) -> bool:
@@ -124,28 +123,28 @@ class TextBuffer:
         )
         lines = text.split("\n")
 
-        right_part = self.lines[self.cursor.line][self.cursor.column :]
+        right_part = self._lines[self.cursor.line][self.cursor.column :]
 
         for i, line in enumerate(lines):
             if self.overwrite_mode:
-                right_part = self.lines[self.cursor.line][
+                right_part = self._lines[self.cursor.line][
                     self.cursor.column + len(line) :
                 ]
 
-            self.lines[self.cursor.line] = (
-                self.lines[self.cursor.line][: self.cursor.column] + line
+            self._lines[self.cursor.line] = (
+                self._lines[self.cursor.line][: self.cursor.column] + line
             )
             self._cursor = Cursor(self.cursor.line, self.cursor.column + len(line))
 
             if i != len(lines) - 1:
-                self.lines.insert(self.cursor.line + 1, "")
+                self._lines.insert(self.cursor.line + 1, "")
                 self._cursor = Cursor(self.cursor.line + 1, 0)
 
             if self.overwrite_mode:
-                self.lines[self.cursor.line] += right_part
+                self._lines[self.cursor.line] += right_part
 
         if not self.overwrite_mode:
-            self.lines[self.cursor.line] += right_part
+            self._lines[self.cursor.line] += right_part
 
         if call_on_text_changed:
             self.on_text_changed(*self.on_text_changed_params)
@@ -169,34 +168,34 @@ class TextBuffer:
 
     def _process_backspace(self) -> None:
         if self.cursor.column > 0:
-            self.lines[self.cursor.line] = (
-                self.lines[self.cursor.line][: self.cursor.column - 1]
-                + self.lines[self.cursor.line][self.cursor.column :]
+            self._lines[self.cursor.line] = (
+                self._lines[self.cursor.line][: self.cursor.column - 1]
+                + self._lines[self.cursor.line][self.cursor.column :]
             )
             self._cursor = Cursor(self.cursor.line, self.cursor.column - 1)
 
             self.on_text_changed(*self.on_text_changed_params)
 
         elif self.cursor.line > 0:
-            previous_line_length = len(self.lines[self.cursor.line - 1])
-            self.lines[self.cursor.line - 1] += self.lines[self.cursor.line]
-            self.lines.pop(self.cursor.line)
+            previous_line_length = len(self._lines[self.cursor.line - 1])
+            self._lines[self.cursor.line - 1] += self._lines[self.cursor.line]
+            self._lines.pop(self.cursor.line)
             self._cursor = Cursor(self.cursor.line - 1, previous_line_length)
 
             self.on_text_changed(*self.on_text_changed_params)
 
     def _process_delete(self) -> None:
-        if self.cursor.column < len(self.lines[self.cursor.line]):
-            self.lines[self.cursor.line] = (
-                self.lines[self.cursor.line][: self.cursor.column]
-                + self.lines[self.cursor.line][self.cursor.column + 1 :]
+        if self.cursor.column < len(self._lines[self.cursor.line]):
+            self._lines[self.cursor.line] = (
+                self._lines[self.cursor.line][: self.cursor.column]
+                + self._lines[self.cursor.line][self.cursor.column + 1 :]
             )
 
             self.on_text_changed(*self.on_text_changed_params)
 
-        elif self.cursor.line < len(self.lines) - 1:
-            self.lines[self.cursor.line] += self.lines[self.cursor.line + 1]
-            self.lines.pop(self.cursor.line + 1)
+        elif self.cursor.line < len(self._lines) - 1:
+            self._lines[self.cursor.line] += self._lines[self.cursor.line + 1]
+            self._lines.pop(self.cursor.line + 1)
 
             self.on_text_changed(*self.on_text_changed_params)
 
@@ -208,16 +207,16 @@ class TextBuffer:
         start, end = selection
 
         if start.line == end.line:
-            self.lines[start.line] = (
-                self.lines[start.line][: start.column]
-                + self.lines[start.line][end.column :]
+            self._lines[start.line] = (
+                self._lines[start.line][: start.column]
+                + self._lines[start.line][end.column :]
             )
         else:
-            self.lines[start.line] = (
-                self.lines[start.line][: start.column]
-                + self.lines[end.line][end.column :]
+            self._lines[start.line] = (
+                self._lines[start.line][: start.column]
+                + self._lines[end.line][end.column :]
             )
-            del self.lines[start.line + 1 : end.line + 1]
+            del self._lines[start.line + 1 : end.line + 1]
 
         self._cursor = Cursor(start.line, start.column)
         self.reset_selection()
@@ -229,7 +228,7 @@ class TextBuffer:
 
     def select_all(self) -> None:
         self._selection_anchor = Cursor(0, 0)
-        self._cursor = Cursor(len(self.lines) - 1, len(self.lines[-1]))
+        self._cursor = Cursor(len(self._lines) - 1, len(self._lines[-1]))
 
     def reset_selection(self) -> None:
         self._selection_anchor = None
@@ -237,22 +236,21 @@ class TextBuffer:
     def move_cursor_word(
         self, direction: Literal["left", "right"], select: bool = False
     ) -> None:
-        line = self.cursor.line
-        column = self.cursor.column
-        current_line = self.lines[line]
+        line, column = self.cursor
+        current_line = self._lines[line]
 
         match direction:
             case "left":
                 step, offset = -1, -1
                 if column == 0 and line > 0:
                     line -= 1
-                    current_line = self.lines[line]
+                    current_line = self._lines[line]
                     column = len(current_line)
             case "right":
                 step, offset = 1, 0
-                if column == len(current_line) and line < len(self.lines) - 1:
+                if column == len(current_line) and line < len(self._lines) - 1:
                     line += 1
-                    current_line = self.lines[line]
+                    current_line = self._lines[line]
                     column = 0
             case _:
                 raise ValueError(
@@ -260,7 +258,7 @@ class TextBuffer:
                 )
 
         if self.is_empty_selection() and select:
-            self._selection_anchor = Cursor(self.cursor.line, self.cursor.column)
+            self._selection_anchor = Cursor(*self.cursor)
 
         while 0 <= column + offset < len(current_line) and not self.is_word_char(
             current_line[column + offset]
@@ -274,31 +272,28 @@ class TextBuffer:
 
         self._cursor = Cursor(line, column)
 
-        if not select:
+        if not select or self.is_empty_selection():
             self.reset_selection()
 
     def move_cursor_horizontal(
         self, direction: Literal["left", "right"], select: bool = False
     ) -> None:
-        line = self.cursor.line
-        column = self.cursor.column
+        line, column = self.cursor
         selection = self.selection
 
         match direction:
             case "left":
                 if selection and not select:
-                    line = selection[0].line
-                    column = selection[0].column
+                    line, column = selection[0]
                 elif column == 0 and line > 0:
                     line -= 1
-                    column = len(self.lines[line])
+                    column = len(self._lines[line])
                 else:
                     column = max(column - 1, 0)
             case "right":
                 if selection and not select:
-                    line = selection[1].line
-                    column = selection[1].column
-                elif column == len(self.lines[line]) and line < len(self.lines) - 1:
+                    line, column = selection[1]
+                elif column == len(self._lines[line]) and line < len(self._lines) - 1:
                     line += 1
                     column = 0
                 else:
@@ -309,20 +304,19 @@ class TextBuffer:
                 )
 
         if not selection and select:
-            self._selection_anchor = Cursor(self.cursor.line, self.cursor.column)
+            self._selection_anchor = Cursor(*self.cursor)
 
-        line = max(0, min(len(self.lines) - 1, line))
-        column = max(0, min(len(self.lines[line]), column))
+        line = max(0, min(len(self._lines) - 1, line))
+        column = max(0, min(len(self._lines[line]), column))
         self._cursor = Cursor(line, column)
 
-        if not select:
+        if not select or self.is_empty_selection():
             self.reset_selection()
 
 
 if __name__ == "__main__":
     text_buffer = TextBuffer()
     text_buffer.add_text("hello world")
-    # text_buffer.lines.clear()
     print("text:", repr(text_buffer.text))
     text_buffer.overwrite_mode = True
     text_buffer.set_cursor_coord(0, 5)
