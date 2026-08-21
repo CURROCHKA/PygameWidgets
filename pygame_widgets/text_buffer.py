@@ -1,8 +1,6 @@
 from collections.abc import Callable
 from typing import NamedTuple
 
-# TODO: return erased strings after erase...() func like .pop()
-
 
 def _empty_callback(*args) -> None:
     pass
@@ -163,11 +161,14 @@ class TextBuffer:
         if call_on_text_changed:
             self.on_text_changed(*self.on_text_changed_params)
 
-    def delete_left(self) -> None:
-        if self.delete_selected_text():
-            return
+    def delete_left(self) -> str:
+        deleted_selected_text = self.delete_selected_text()
+        if deleted_selected_text:
+            return deleted_selected_text
 
+        deleted_text = ""
         if self.cursor.column > 0:
+            deleted_text = self._lines[self.cursor.line][self.cursor.column - 1]
             self._lines[self.cursor.line] = (
                 self._lines[self.cursor.line][: self.cursor.column - 1]
                 + self._lines[self.cursor.line][self.cursor.column :]
@@ -177,6 +178,7 @@ class TextBuffer:
             self.on_text_changed(*self.on_text_changed_params)
 
         elif self.cursor.line > 0:
+            deleted_text = "\n"
             previous_line_length = len(self._lines[self.cursor.line - 1])
             self._lines[self.cursor.line - 1] += self._lines[self.cursor.line]
             self._lines.pop(self.cursor.line)
@@ -185,12 +187,16 @@ class TextBuffer:
             self.on_text_changed(*self.on_text_changed_params)
 
         self.reset_selection()
+        return deleted_text
 
-    def delete_right(self) -> None:
-        if self.delete_selected_text():
-            return
+    def delete_right(self) -> str:
+        deleted_selected_text = self.delete_selected_text()
+        if deleted_selected_text:
+            return deleted_selected_text
 
+        deleted_text = ""
         if self.cursor.column < len(self._lines[self.cursor.line]):
+            deleted_text = self._lines[self.cursor.line][self.cursor.column]
             self._lines[self.cursor.line] = (
                 self._lines[self.cursor.line][: self.cursor.column]
                 + self._lines[self.cursor.line][self.cursor.column + 1 :]
@@ -199,19 +205,22 @@ class TextBuffer:
             self.on_text_changed(*self.on_text_changed_params)
 
         elif self.cursor.line < len(self._lines) - 1:
+            deleted_text = "\n"
             self._lines[self.cursor.line] += self._lines[self.cursor.line + 1]
             self._lines.pop(self.cursor.line + 1)
 
             self.on_text_changed(*self.on_text_changed_params)
 
         self.reset_selection()
+        return deleted_text
 
-    def delete_selected_text(self, call_on_text_changed: bool = True) -> bool:
+    def delete_selected_text(self, call_on_text_changed: bool = True) -> str:
         selection = self.selection
         if not selection:
-            return False
+            return ""
 
         start, end = selection
+        deleted_text = self.selected_text
 
         if start.line == end.line:
             self._lines[start.line] = (
@@ -231,7 +240,7 @@ class TextBuffer:
         if call_on_text_changed:
             self.on_text_changed(*self.on_text_changed_params)
 
-        return True
+        return deleted_text
 
     def select_all(self) -> None:
         self._selection_anchor = Cursor(0, 0)
