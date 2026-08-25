@@ -30,7 +30,7 @@ class TextBuffer:
         self.on_text_changed = on_text_changed
         self.on_text_changed_params = on_text_changed_params
 
-        self.overwrite_mode = False
+        self._overwrite_mode = False
 
         if initial_text:
             self._set_text(initial_text, False)
@@ -112,51 +112,41 @@ class TextBuffer:
         return self.selection_anchor, self.cursor
 
     def get_lines_from_text(self, text: str) -> list[str]:
-        text = (
-            text.replace("\r\n", "\n")
-            .replace("\r", "\n")
-            .replace("\t", " " * self.tab_spaces)
-        )
-        return text.split("\n")
-
-    def _insert_text(self, lines: list[str]) -> None:
-        right_part = self._lines[self.cursor.line][self.cursor.column :]
-        for i, line in enumerate(lines):
-            self._lines[self.cursor.line] = (
-                self._lines[self.cursor.line][: self.cursor.column] + line
-            )
-            self._cursor = Cursor(self.cursor.line, self.cursor.column + len(line))
-
-            if i != len(lines) - 1:
-                self._lines.insert(self.cursor.line + 1, "")
-                self._cursor = Cursor(self.cursor.line + 1, 0)
-
-        self._lines[self.cursor.line] += right_part
-
-    def _overwrite_text(self, lines: list[str]) -> None:
-        for i, line in enumerate(lines):
-            right_part = self._lines[self.cursor.line][self.cursor.column + len(line) :]
-
-            self._lines[self.cursor.line] = (
-                self._lines[self.cursor.line][: self.cursor.column] + line
-            )
-            self._cursor = Cursor(self.cursor.line, self.cursor.column + len(line))
-
-            if i != len(lines) - 1:
-                self._lines.insert(self.cursor.line + 1, "")
-                self._cursor = Cursor(self.cursor.line + 1, 0)
-
-            self._lines[self.cursor.line] += right_part
+        text = text.replace("\t", " " * self.tab_spaces)
+        lines = text.splitlines(keepends=True)
+        return lines
 
     def add_text(self, text: str, call_on_text_changed: bool = True) -> None:
-        self.delete_selected_text(call_on_text_changed)
+        if (
+            self.overwrite_mode
+            and len(text) == 1
+            and text not in "\r\n"
+            and self.is_empty_selection()
+        ):
+            offset = 1
+        else:
+            offset = 0
+
+        self.delete_selected_text(call_on_text_changed=False)
 
         lines = self.get_lines_from_text(text)
+        cursor_line, cursor_column = self.cursor
 
-        if len(text) > 1 or not self.overwrite_mode:
-            self._insert_text(lines)
+        left_part = self._lines[cursor_line][:cursor_column]
+        right_part = self._lines[cursor_line][cursor_column + offset :]
+
+        if len(lines) == 1:
+            self._lines[cursor_line] = left_part + lines[0] + right_part
+            self._cursor = Cursor(cursor_line, cursor_column + len(lines[0]))
         else:
-            self._overwrite_text(lines)
+            lines[0] = left_part + lines[0]
+            lines[-1] = lines[-1] + right_part
+
+            self._lines[cursor_line : cursor_line + 1] = lines
+
+            self._cursor = Cursor(
+                cursor_line + len(lines) - 1, len(lines[-1]) - len(right_part)
+            )
 
         if call_on_text_changed:
             self.on_text_changed(*self.on_text_changed_params)
@@ -249,6 +239,17 @@ class TextBuffer:
     def reset_selection(self) -> None:
         self._selection_anchor = None
 
+    def _clamp_cursor(self, line: int, column: int) -> None:
+        line = max(0, min(len(self._lines) - 1, line))
+        column = max(0, min(len(self._lines[line]), column))
+        self._cursor = Cursor(line, column)
+
+    def _apply_cursor_move(self, line: int, column: int, select: bool) -> None:
+        self._clamp_cursor(line, column)
+
+        if not select or self.is_empty_selection():
+            self.reset_selection()
+
     def move_cursor_word_left(self, select: bool = False) -> None:
         line, column = self.cursor
         current_line = self._lines[line]
@@ -261,20 +262,13 @@ class TextBuffer:
         if self.is_empty_selection() and select:
             self._selection_anchor = Cursor(*self.cursor)
 
-        while 0 <= column - 1 < len(current_line) and not self.is_word_char(
-            current_line[column - 1]
-        ):
+        while 0 <= column - 1 and not self.is_word_char(current_line[column - 1]):
             column -= 1
 
-        while 0 <= column - 1 < len(current_line) and self.is_word_char(
-            current_line[column - 1]
-        ):
+        while 0 <= column - 1 and self.is_word_char(current_line[column - 1]):
             column -= 1
 
-        self._cursor = Cursor(line, column)
-
-        if not select or self.is_empty_selection():
-            self.reset_selection()
+        self._apply_cursor_move(line, column, select)
 
     def move_cursor_word_right(self, select: bool = False) -> None:
         line, column = self.cursor
@@ -288,20 +282,15 @@ class TextBuffer:
         if self.is_empty_selection() and select:
             self._selection_anchor = Cursor(*self.cursor)
 
-        while 0 <= column < len(current_line) and not self.is_word_char(
+        while column < len(current_line) and not self.is_word_char(
             current_line[column]
         ):
             column += 1
 
-        while 0 <= column < len(current_line) and self.is_word_char(
-            current_line[column]
-        ):
+        while column < len(current_line) and self.is_word_char(current_line[column]):
             column += 1
 
-        self._cursor = Cursor(line, column)
-
-        if not select or self.is_empty_selection():
-            self.reset_selection()
+        self._apply_cursor_move(line, column, select)
 
     def move_cursor_left(self, select: bool = False) -> None:
         line, column = self.cursor
@@ -318,12 +307,7 @@ class TextBuffer:
         if not selection and select:
             self._selection_anchor = Cursor(*self.cursor)
 
-        line = max(0, min(len(self._lines) - 1, line))
-        column = max(0, min(len(self._lines[line]), column))
-        self._cursor = Cursor(line, column)
-
-        if not select or self.is_empty_selection():
-            self.reset_selection()
+        self._apply_cursor_move(line, column, select)
 
     def move_cursor_right(self, select: bool = False) -> None:
         line, column = self.cursor
@@ -340,21 +324,20 @@ class TextBuffer:
         if not selection and select:
             self._selection_anchor = Cursor(*self.cursor)
 
-        line = max(0, min(len(self._lines) - 1, line))
-        column = max(0, min(len(self._lines[line]), column))
-        self._cursor = Cursor(line, column)
+        self._apply_cursor_move(line, column, select)
 
-        if not select or self.is_empty_selection():
-            self.reset_selection()
+    @property
+    def overwrite_mode(self) -> bool:
+        return self._overwrite_mode
 
     def enable_overwrite_mode(self) -> None:
-        self.overwrite_mode = True
+        self._overwrite_mode = True
 
     def disable_overwrite_mode(self) -> None:
-        self.overwrite_mode = False
+        self._overwrite_mode = False
 
     def switch_overwrite_mode(self) -> None:
-        self.overwrite_mode = not self.overwrite_mode
+        self._overwrite_mode = not self.overwrite_mode
 
 
 if __name__ == "__main__":
@@ -377,6 +360,6 @@ if __name__ == "__main__":
     print(text_buffer.cursor)
     text_buffer.add_text("glue ")
     print("text:", repr(text_buffer.text))
-    text_buffer.overwrite_mode = True
+    text_buffer.disable_overwrite_mode()
     text_buffer.add_text("cold")
     print("text:", repr(text_buffer.text))
