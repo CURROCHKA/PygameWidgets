@@ -47,7 +47,7 @@ class TextLayoutManager:
         logical_lines: list[str],
         actual_width: int,
         font: pygame.freetype.Font,
-        tab_spaces: int,
+        tab_size: int,
     ) -> None:
         """Rebuild the soft-wrapped visual-line cache."""
         self.cached_visual_lines = []
@@ -70,7 +70,7 @@ class TextLayoutManager:
             range_start = len(self.cached_visual_lines)
 
             for visual_line in self._wrap_logical_line(
-                line, line_index, actual_width, font, tab_spaces
+                line, line_index, actual_width, font, tab_size
             ):
                 self.cached_visual_lines.append(visual_line)
 
@@ -83,19 +83,17 @@ class TextLayoutManager:
         line_index: int,
         actual_width: int,
         font: pygame.freetype.Font,
-        tab_spaces: int,
+        tab_size: int,
     ) -> list[VisualLine]:
         if line == "":
-            return [self._make_visual_line("", line_index, 0, 0, font, tab_spaces)]
+            return [self._make_visual_line("", line_index, 0, 0, font, tab_size)]
 
         visual_lines = []
         start = 0
         line_length = len(line)
 
         while start < len(line):
-            end = self._find_visual_line_end(
-                line, start, actual_width, font, tab_spaces
-            )
+            end = self._find_visual_line_end(line, start, actual_width, font, tab_size)
 
             if end == len(line):
                 visual_lines.append(
@@ -105,7 +103,7 @@ class TextLayoutManager:
                         start,
                         line_length,
                         font,
-                        tab_spaces,
+                        tab_size,
                     )
                 )
                 break
@@ -119,7 +117,7 @@ class TextLayoutManager:
                         start,
                         line_length,
                         font,
-                        tab_spaces,
+                        tab_size,
                     )
                 )
                 start = end
@@ -138,7 +136,7 @@ class TextLayoutManager:
                         start,
                         line_length,
                         font,
-                        tab_spaces,
+                        tab_size,
                     )
                 )
                 start = last_space + 1
@@ -150,7 +148,7 @@ class TextLayoutManager:
                         start,
                         line_length,
                         font,
-                        tab_spaces,
+                        tab_size,
                     )
                 )
                 start = end
@@ -164,13 +162,13 @@ class TextLayoutManager:
         start_at: int,
         logical_line_length: int,
         font: pygame.freetype.Font,
-        tab_spaces: int,
+        tab_size: int,
     ) -> VisualLine:
         return VisualLine(
             text=text,
             line_index=line_index,
             start_at=start_at,
-            prefix_widths=self._build_prefix_widths(text, font, tab_spaces),
+            prefix_widths=self._build_prefix_widths(text, font, tab_size),
             logical_line_length=logical_line_length,
         )
 
@@ -180,7 +178,7 @@ class TextLayoutManager:
         start: int,
         actual_width: int,
         font: pygame.freetype.Font,
-        tab_spaces: int,
+        tab_size: int,
     ) -> int:
         low = start
         high = len(line) + 1
@@ -188,7 +186,7 @@ class TextLayoutManager:
         while low + 1 < high:
             candidate_end = (low + high) // 2
             if (
-                self._get_text_width(line[start:candidate_end], font, tab_spaces)
+                self._get_text_width(line[start:candidate_end], font, tab_size)
                 <= actual_width
             ):
                 low = candidate_end
@@ -197,9 +195,9 @@ class TextLayoutManager:
         return low
 
     def _get_text_width(
-        self, text: str, font: pygame.freetype.Font, tab_spaces: int, style: int = 0
+        self, text: str, font: pygame.freetype.Font, tab_size: int, style: int = 0
     ) -> int:
-        text = text.replace("\t", " " * tab_spaces)
+        text = text.replace("\t", " " * tab_size)
         cache_key = (id(font), text, style)
 
         if cache_key in self._width_cache:
@@ -214,7 +212,7 @@ class TextLayoutManager:
         return width
 
     def _build_prefix_widths(
-        self, text: str, font: pygame.freetype.Font, tab_spaces: int
+        self, text: str, font: pygame.freetype.Font, tab_size: int
     ) -> list[int]:
         widths = [0]
         if not text:
@@ -226,7 +224,7 @@ class TextLayoutManager:
             if glyph:
                 cumulative += int(glyph[4])
             else:
-                cumulative += self._get_text_width(text[i], font, tab_spaces)
+                cumulative += self._get_text_width(text[i], font, tab_size)
             widths.append(cumulative)
         return widths
 

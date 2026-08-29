@@ -1,4 +1,3 @@
-from collections.abc import Callable
 from typing import NamedTuple
 
 
@@ -15,17 +14,12 @@ class TextBuffer:
     def __init__(
         self,
         initial_text: str = "",
-        on_text_changed: Callable = _empty_callback,
-        on_text_changed_params: tuple | list = (),
     ) -> None:
+        # TODO: Add a notification system
         self._lines = [""]
 
         self._cursor = Cursor(0, 0)
         self._selection_anchor: Cursor | None = None
-
-        # TODO: Perhaps these attributes should be moved from here. Outdated callback pattern
-        self.on_text_changed = on_text_changed
-        self.on_text_changed_params = on_text_changed_params
 
         self._overwrite_mode = False
 
@@ -89,11 +83,11 @@ class TextBuffer:
     def text(self, value: str) -> None:
         self._set_text(value, True)
 
-    def _set_text(self, text: str, call_on_text_changed: bool) -> None:
+    def _set_text(self, text: str) -> None:
         self._lines = [""]
         self._cursor = Cursor(0, 0)
         self.reset_selection()
-        self.add_text(text, call_on_text_changed)
+        self.add_text(text)
 
     def is_empty_lines(self) -> bool:
         return self._lines == [""]
@@ -113,7 +107,7 @@ class TextBuffer:
             return self.cursor, self.selection_anchor
         return self.selection_anchor, self.cursor
 
-    def add_text(self, text: str, call_on_text_changed: bool = True) -> None:
+    def add_text(self, text: str) -> None:
         if (
             self.overwrite_mode
             and len(text) == 1
@@ -124,9 +118,9 @@ class TextBuffer:
         else:
             offset = 0
 
-        self.delete_selected_text(call_on_text_changed=False)
+        self.delete_selected_text()
 
-        lines = text.splitlines()
+        lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
         cursor_line, cursor_column = self.cursor
 
         left_part = self._lines[cursor_line][:cursor_column]
@@ -145,9 +139,6 @@ class TextBuffer:
                 cursor_line + len(lines) - 1, len(lines[-1]) - len(right_part)
             )
 
-        if call_on_text_changed:
-            self.on_text_changed(*self.on_text_changed_params)
-
     def delete_left(self) -> str:
         if deleted := self.delete_selected_text():
             return deleted
@@ -159,13 +150,11 @@ class TextBuffer:
                 self._lines[line][: column - 1] + self._lines[line][column:]
             )
             self._cursor = Cursor(line, column - 1)
-            self.on_text_changed(*self.on_text_changed_params)
         elif line > 0:
             deleted_text = "\n"
             previous_line_len = len(self._lines[line - 1])
             self._lines[line - 1] += self._lines.pop(line)
             self._cursor = Cursor(line - 1, previous_line_len)
-            self.on_text_changed(*self.on_text_changed_params)
         else:
             return ""
 
@@ -182,18 +171,16 @@ class TextBuffer:
             self._lines[line] = (
                 self._lines[line][:column] + self._lines[line][column + 1 :]
             )
-            self.on_text_changed(*self.on_text_changed_params)
         elif line < len(self._lines) - 1:
             deleted_text = "\n"
             self._lines[line] += self._lines.pop(line + 1)
-            self.on_text_changed(*self.on_text_changed_params)
         else:
             return ""
 
         self.reset_selection()
         return deleted_text
 
-    def delete_selected_text(self, call_on_text_changed: bool = True) -> str:
+    def delete_selected_text(self) -> str:
         selection = self.selection
         if not selection:
             return ""
@@ -215,9 +202,6 @@ class TextBuffer:
 
         self._cursor = Cursor(start.line, start.column)
         self.reset_selection()
-
-        if call_on_text_changed:
-            self.on_text_changed(*self.on_text_changed_params)
 
         return deleted_text
 
@@ -325,7 +309,7 @@ class TextBuffer:
     def disable_overwrite_mode(self) -> None:
         self._overwrite_mode = False
 
-    def switch_overwrite_mode(self) -> None:
+    def toggle_overwrite_mode(self) -> None:
         self._overwrite_mode = not self.overwrite_mode
 
 

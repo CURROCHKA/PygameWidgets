@@ -32,7 +32,7 @@ class TextBoxStyle:
     placeholder_text_color: ColorLike = (10, 10, 10)
 
     read_only: bool = False
-    tab_spaces: int = 4
+    tab_size: int = 4
 
     lines_per_scroll: int = 1
 
