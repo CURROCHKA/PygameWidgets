@@ -43,7 +43,11 @@ class TextLayoutManager:
         self._width_cache: OrderedDict = OrderedDict()
 
     def update_visual_lines(
-        self, logical_lines: list[str], actual_width: int, font: pygame.freetype.Font
+        self,
+        logical_lines: list[str],
+        actual_width: int,
+        font: pygame.freetype.Font,
+        tab_spaces: int,
     ) -> None:
         """Rebuild the soft-wrapped visual-line cache."""
         self.cached_visual_lines = []
@@ -66,7 +70,7 @@ class TextLayoutManager:
             range_start = len(self.cached_visual_lines)
 
             for visual_line in self._wrap_logical_line(
-                line, line_index, actual_width, font
+                line, line_index, actual_width, font, tab_spaces
             ):
                 self.cached_visual_lines.append(visual_line)
 
@@ -74,22 +78,34 @@ class TextLayoutManager:
             self.visual_line_ranges[line_index] = (range_start, range_end)
 
     def _wrap_logical_line(
-        self, line: str, line_index: int, actual_width: int, font: pygame.freetype.Font
+        self,
+        line: str,
+        line_index: int,
+        actual_width: int,
+        font: pygame.freetype.Font,
+        tab_spaces: int,
     ) -> list[VisualLine]:
         if line == "":
-            return [self._make_visual_line("", line_index, 0, font, 0)]
+            return [self._make_visual_line("", line_index, 0, 0, font, tab_spaces)]
 
         visual_lines = []
         start = 0
         line_length = len(line)
 
         while start < len(line):
-            end = self._find_visual_line_end(line, start, actual_width, font)
+            end = self._find_visual_line_end(
+                line, start, actual_width, font, tab_spaces
+            )
 
             if end == len(line):
                 visual_lines.append(
                     self._make_visual_line(
-                        line[start:end], line_index, start, font, line_length
+                        line[start:end],
+                        line_index,
+                        start,
+                        line_length,
+                        font,
+                        tab_spaces,
                     )
                 )
                 break
@@ -98,7 +114,12 @@ class TextLayoutManager:
                 end = start + 1
                 visual_lines.append(
                     self._make_visual_line(
-                        line[start:end], line_index, start, font, line_length
+                        line[start:end],
+                        line_index,
+                        start,
+                        line_length,
+                        font,
+                        tab_spaces,
                     )
                 )
                 start = end
@@ -115,15 +136,21 @@ class TextLayoutManager:
                         line[start : last_space + 1],
                         line_index,
                         start,
-                        font,
                         line_length,
+                        font,
+                        tab_spaces,
                     )
                 )
                 start = last_space + 1
             else:
                 visual_lines.append(
                     self._make_visual_line(
-                        line[start:end], line_index, start, font, line_length
+                        line[start:end],
+                        line_index,
+                        start,
+                        line_length,
+                        font,
+                        tab_spaces,
                     )
                 )
                 start = end
@@ -135,34 +162,44 @@ class TextLayoutManager:
         text: str,
         line_index: int,
         start_at: int,
-        font: pygame.freetype.Font,
         logical_line_length: int,
+        font: pygame.freetype.Font,
+        tab_spaces: int,
     ) -> VisualLine:
         return VisualLine(
             text=text,
             line_index=line_index,
             start_at=start_at,
-            prefix_widths=self._build_prefix_widths(text, font),
+            prefix_widths=self._build_prefix_widths(text, font, tab_spaces),
             logical_line_length=logical_line_length,
         )
 
     def _find_visual_line_end(
-        self, line: str, start: int, actual_width: int, font: pygame.freetype.Font
+        self,
+        line: str,
+        start: int,
+        actual_width: int,
+        font: pygame.freetype.Font,
+        tab_spaces: int,
     ) -> int:
         low = start
         high = len(line) + 1
 
         while low + 1 < high:
             candidate_end = (low + high) // 2
-            if self._get_text_width(line[start:candidate_end], font) <= actual_width:
+            if (
+                self._get_text_width(line[start:candidate_end], font, tab_spaces)
+                <= actual_width
+            ):
                 low = candidate_end
             else:
                 high = candidate_end
         return low
 
     def _get_text_width(
-        self, text: str, font: pygame.freetype.Font, style: int = 0
+        self, text: str, font: pygame.freetype.Font, tab_spaces: int, style: int = 0
     ) -> int:
+        text = text.replace("\t", " " * tab_spaces)
         cache_key = (id(font), text, style)
 
         if cache_key in self._width_cache:
@@ -176,7 +213,9 @@ class TextLayoutManager:
         self._width_cache[cache_key] = width
         return width
 
-    def _build_prefix_widths(self, text: str, font: pygame.freetype.Font) -> list[int]:
+    def _build_prefix_widths(
+        self, text: str, font: pygame.freetype.Font, tab_spaces: int
+    ) -> list[int]:
         widths = [0]
         if not text:
             return widths
@@ -187,7 +226,7 @@ class TextLayoutManager:
             if glyph:
                 cumulative += int(glyph[4])
             else:
-                cumulative += self._get_text_width(text[i], font)
+                cumulative += self._get_text_width(text[i], font, tab_spaces)
             widths.append(cumulative)
         return widths
 

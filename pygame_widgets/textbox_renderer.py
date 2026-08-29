@@ -78,6 +78,7 @@ class TextBoxRenderer:
         color: ColorLike,
         style: int = 0,
     ) -> pygame.Surface:
+        text = text.replace("\t", " " * state.style.tab_spaces)
         cache_key = (id(state.style.font), text, color, style)
 
         if cache_key in self._rendered_text_cache:

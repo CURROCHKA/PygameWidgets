@@ -15,7 +15,6 @@ class TextBuffer:
     def __init__(
         self,
         initial_text: str = "",
-        tab_spaces: int = 4,
         on_text_changed: Callable = _empty_callback,
         on_text_changed_params: tuple | list = (),
     ) -> None:
@@ -23,9 +22,6 @@ class TextBuffer:
 
         self._cursor = Cursor(0, 0)
         self._selection_anchor: Cursor | None = None
-
-        # TODO: The buffer doesn’t need to know about tab_spaces, that’s the renderer’s (and maybe layout) job
-        self.tab_spaces = tab_spaces
 
         # TODO: Perhaps these attributes should be moved from here. Outdated callback pattern
         self.on_text_changed = on_text_changed
@@ -117,11 +113,6 @@ class TextBuffer:
             return self.cursor, self.selection_anchor
         return self.selection_anchor, self.cursor
 
-    def get_lines_from_text(self, text: str) -> list[str]:
-        text = text.replace("\t", " " * self.tab_spaces)
-        lines = text.splitlines()
-        return lines
-
     def add_text(self, text: str, call_on_text_changed: bool = True) -> None:
         if (
             self.overwrite_mode
@@ -135,7 +126,7 @@ class TextBuffer:
 
         self.delete_selected_text(call_on_text_changed=False)
 
-        lines = self.get_lines_from_text(text)
+        lines = text.splitlines()
         cursor_line, cursor_column = self.cursor
 
         left_part = self._lines[cursor_line][:cursor_column]
