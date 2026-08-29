@@ -24,6 +24,7 @@ class TextBuffer:
         self._cursor = Cursor(0, 0)
         self._selection_anchor: Cursor | None = None
 
+        # TODO: The buffer doesn’t need to know about tab_spaces, that’s the renderer’s (and maybe layout) job
         self.tab_spaces = tab_spaces
 
         # TODO: Perhaps these attributes should be moved from here. Outdated callback pattern
@@ -48,7 +49,9 @@ class TextBuffer:
     def cursor(self) -> Cursor:
         return self._cursor
 
-    def set_cursor_coord(self, line: int, column: int) -> None:
+    @cursor.setter
+    def cursor(self, coord: tuple[int, int]) -> None:
+        line, column = coord
         self._validate_cursor_coord(line, column)
         self._cursor = Cursor(line, column)
 
@@ -56,7 +59,9 @@ class TextBuffer:
     def selection_anchor(self) -> Cursor | None:
         return self._selection_anchor
 
-    def set_selection_anchor_coord(self, line: int, column: int) -> None:
+    @selection_anchor.setter
+    def selection_anchor(self, coord: tuple[int, int]) -> None:
+        line, column = coord
         self._validate_cursor_coord(line, column)
         self._selection_anchor = Cursor(line, column)
 
@@ -71,13 +76,14 @@ class TextBuffer:
         if start.line == end.line:
             return self._lines[start.line][start.column : end.column]
 
-        result = []
-
-        result.append(self._lines[start.line][start.column :])
-        result.extend(self._lines[start.line + 1 : end.line])
-        result.append(self._lines[end.line][: end.column])
-
-        return "\n".join(result)
+        text = "\n".join(
+            [
+                self._lines[start.line][start.column :],
+                *self._lines[start.line + 1 : end.line],
+                self._lines[end.line][: end.column],
+            ]
+        )
+        return text
 
     @property
     def text(self) -> str:
@@ -113,7 +119,7 @@ class TextBuffer:
 
     def get_lines_from_text(self, text: str) -> list[str]:
         text = text.replace("\t", " " * self.tab_spaces)
-        lines = text.splitlines(keepends=True)
+        lines = text.splitlines()
         return lines
 
     def add_text(self, text: str, call_on_text_changed: bool = True) -> None:
@@ -152,54 +158,46 @@ class TextBuffer:
             self.on_text_changed(*self.on_text_changed_params)
 
     def delete_left(self) -> str:
-        deleted_selected_text = self.delete_selected_text()
-        if deleted_selected_text:
-            return deleted_selected_text
+        if deleted := self.delete_selected_text():
+            return deleted
 
-        deleted_text = ""
-        if self.cursor.column > 0:
-            deleted_text = self._lines[self.cursor.line][self.cursor.column - 1]
-            self._lines[self.cursor.line] = (
-                self._lines[self.cursor.line][: self.cursor.column - 1]
-                + self._lines[self.cursor.line][self.cursor.column :]
+        line, column = self.cursor
+        if column > 0:
+            deleted_text = self._lines[line][column - 1]
+            self._lines[line] = (
+                self._lines[line][: column - 1] + self._lines[line][column:]
             )
-            self._cursor = Cursor(self.cursor.line, self.cursor.column - 1)
-
+            self._cursor = Cursor(line, column - 1)
             self.on_text_changed(*self.on_text_changed_params)
-
-        elif self.cursor.line > 0:
+        elif line > 0:
             deleted_text = "\n"
-            previous_line_length = len(self._lines[self.cursor.line - 1])
-            self._lines[self.cursor.line - 1] += self._lines[self.cursor.line]
-            self._lines.pop(self.cursor.line)
-            self._cursor = Cursor(self.cursor.line - 1, previous_line_length)
-
+            previous_line_len = len(self._lines[line - 1])
+            self._lines[line - 1] += self._lines.pop(line)
+            self._cursor = Cursor(line - 1, previous_line_len)
             self.on_text_changed(*self.on_text_changed_params)
+        else:
+            return ""
 
         self.reset_selection()
         return deleted_text
 
     def delete_right(self) -> str:
-        deleted_selected_text = self.delete_selected_text()
-        if deleted_selected_text:
-            return deleted_selected_text
+        if deleted := self.delete_selected_text():
+            return deleted
 
-        deleted_text = ""
-        if self.cursor.column < len(self._lines[self.cursor.line]):
-            deleted_text = self._lines[self.cursor.line][self.cursor.column]
-            self._lines[self.cursor.line] = (
-                self._lines[self.cursor.line][: self.cursor.column]
-                + self._lines[self.cursor.line][self.cursor.column + 1 :]
+        line, column = self.cursor
+        if column < len(self._lines[line]):
+            deleted_text = self._lines[line][column]
+            self._lines[line] = (
+                self._lines[line][:column] + self._lines[line][column + 1 :]
             )
-
             self.on_text_changed(*self.on_text_changed_params)
-
-        elif self.cursor.line < len(self._lines) - 1:
+        elif line < len(self._lines) - 1:
             deleted_text = "\n"
-            self._lines[self.cursor.line] += self._lines[self.cursor.line + 1]
-            self._lines.pop(self.cursor.line + 1)
-
+            self._lines[line] += self._lines.pop(line + 1)
             self.on_text_changed(*self.on_text_changed_params)
+        else:
+            return ""
 
         self.reset_selection()
         return deleted_text
@@ -345,11 +343,11 @@ if __name__ == "__main__":
     text_buffer.add_text("hello world")
     print("text:", repr(text_buffer.text))
     text_buffer.enable_overwrite_mode()
-    text_buffer.set_cursor_coord(0, 5)
+    text_buffer.cursor = (0, 5)
     text_buffer.add_text("a\nb")
     print("text:", repr(text_buffer.text))
-    text_buffer.set_selection_anchor_coord(0, 1)
-    text_buffer.set_cursor_coord(0, 5)
+    text_buffer.selection_anchor = (0, 1)
+    text_buffer.cursor = (0, 5)
     print("selected text:", repr(text_buffer.selected_text))
     text_buffer.delete_left()
     print("text:", repr(text_buffer.text))
