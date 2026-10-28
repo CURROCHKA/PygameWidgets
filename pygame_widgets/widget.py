@@ -3,11 +3,27 @@ from abc import ABC, abstractmethod
 from collections import OrderedDict
 from collections.abc import Iterable, Iterator, MutableSet
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 
 import pygame
 from pygame.typing import Point, RectLike
 
+
+class Signal:
+    def __init__(self):
+        self._slots: list[Callable[..., None]] = []
+        
+    def connect(self, slot: Callable[..., None]) -> Callable[..., None]:
+        self._slots.append(slot)
+        return slot
+    
+    def disconnect(self, slot: Callable[..., None]) -> None:
+        self._slots.remove(slot)
+        
+    def emit(self, *args) -> None:
+        for slot in list(self._slots):
+            slot(*args)
+    
 
 class OrderedSet(MutableSet):
     def __init__(self, values: Iterable[Any] = ()):

@@ -1,4 +1,6 @@
+import os
 import functools
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal
 
@@ -6,7 +8,7 @@ import pygame
 import pygame.freetype
 from pygame.typing import ColorLike
 
-from pygame_widgets.widget import MouseEvent, WidgetBase, WidgetHandler
+from pygame_widgets.widget import MouseEvent, Signal, WidgetBase, WidgetHandler
 
 Anchor = Literal[
     "topleft",
@@ -19,6 +21,8 @@ Anchor = Literal[
     "midbottom",
     "bottomright",
 ]
+
+# TODO: align by group (image, text)
 
 
 @functools.cache
@@ -63,8 +67,9 @@ class Button(WidgetBase):
         height: float,
         *,
         text: str = "",
-        image: pygame.Surface | None = None,
+        image: pygame.Surface | str | os.PathLike | None = None,
         style: ButtonStyle | None = None,
+        on_click: Callable[[], None] | None = None,
         is_sub_widget: bool = False,
     ):
         super().__init__(surface, x, y, width, height, is_sub_widget)
@@ -78,6 +83,12 @@ class Button(WidgetBase):
         self._render_text()
 
         self._pressed = False
+
+        self.pressed = Signal()
+        self.released = Signal()
+        self.clicked = Signal()
+        if on_click is not None:
+            self.clicked.connect(on_click)
 
     @property
     def text(self) -> str:
@@ -93,7 +104,9 @@ class Button(WidgetBase):
         return self._image
 
     @image.setter
-    def image(self, value: pygame.Surface) -> None:
+    def image(self, value: pygame.Surface | None) -> None:
+        if isinstance(value, (str, os.PathLike)):
+            value = pygame.image.load(value).convert_alpha()
         self._image = value
 
     @property
@@ -122,13 +135,16 @@ class Button(WidgetBase):
 
     def on_mouse_down(self, event: MouseEvent) -> None:
         self._pressed = event.button == 1
+        if self._pressed:
+            self.pressed.emit()
 
     def on_mouse_up(self, event: MouseEvent) -> None:
-        if event.button != 1:
+        if event.button != 1 or not self._pressed:
             return
-        if self._pressed and self.is_hovered():
-            ...  # on_click()
         self._pressed = False
+        self.released.emit()
+        if self.is_hovered():
+            self.clicked.emit()
 
     def _is_pressed(self) -> bool:
         return self._pressed and WidgetHandler.get_captured() is self
